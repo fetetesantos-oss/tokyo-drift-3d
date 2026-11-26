@@ -52,7 +52,7 @@ class TokyoDriftApp {
     this.camTarget = [0, 1.2, 6];
     this.camYaw = 0;
     this.camFov = 62 * Math.PI / 180;
-    this.garageAngle = 0.65;
+    this.garageAngle = -2.42;
     this.garageDrag = false;
     this.garageLastX = 0;
     this.portraitDismissed = false;
@@ -1013,17 +1013,16 @@ class TokyoDriftApp {
       carYaw = p.yaw; carPitch = p.pitch; carRoll = p.roll;
       braking = p.braking;
     } else {
-      // Showcase car parked cleanly at Tokyo start grid, framed in open viewport beside UI panels
+      // Showcase car angled in dramatic drift stance on wet Shibuya Crossing, looking down the illuminated avenue!
       const p0 = this.world.points[0];
-      carX = p0.x; carY = p0.y; carZ = p0.z; carYaw = p0.yaw;
-      const orbitDist = this.state === 'garage' ? 5.8 : 6.4;
-      const orbitH = this.state === 'garage' ? 1.85 : 2.1;
+      carX = p0.x; carY = p0.y; carZ = p0.z; carYaw = p0.yaw + 0.32;
+      const orbitDist = this.state === 'garage' ? 5.6 : 6.0;
+      const orbitH = this.state === 'garage' ? 1.72 : 1.85;
       const sinA = Math.sin(this.garageAngle);
       const cosA = Math.cos(this.garageAngle);
-      // Camera right vector = forward(-sinA, 0, -cosA) x up(0, 1, 0) = (+cosA, 0, -sinA)
       const camRightX = cosA;
       const camRightZ = -sinA;
-      const lateralFrame = this.state === 'garage' ? 1.85 : -1.95;
+      const lateralFrame = this.state === 'garage' ? 1.75 : -1.85;
       this.camPos = [
         carX + sinA * orbitDist + camRightX * lateralFrame,
         carY + orbitH,
@@ -1031,61 +1030,106 @@ class TokyoDriftApp {
       ];
       this.camTarget = [
         carX + camRightX * lateralFrame,
-        carY + 0.72,
+        carY + 0.85,
         carZ + camRightZ * lateralFrame
       ];
-      this.camFov = 54 * Math.PI / 180;
+      this.camFov = 52 * Math.PI / 180;
     }
 
     const hlPos = [carX + Math.sin(carYaw) * 2.1, carY + 0.85, carZ + Math.cos(carYaw) * 2.1];
     const hlDir = [Math.sin(carYaw), -0.14, Math.cos(carYaw)];
     const ugPos = [carX, carY + 0.2, carZ];
-    const brakeGlow = braking ? 0.75 : 0.0;
+    const brakeGlow = braking ? 0.85 : (this.state !== 'racing' ? 0.35 : 0.0);
     const gfxOpts = this._getQualityConfig();
 
     r.beginFrame(
       this.camPos, this.camTarget, this.camFov,
       wCfg.skyColor, wCfg.fogColor, fogDensity,
-      hlPos, hlDir, ugPos, this.playerUnderglowRgb || [1, 0.2, 0.5], wetness, brakeGlow, gfxOpts
+      hlPos, hlDir, ugPos, this.playerUnderglowRgb || [0.14, 0.82, 0.94], wetness, brakeGlow, gfxOpts
     );
 
-    // Tokyo Midnight Sky Dome & Distant Tokyo Tower Landmark
     if (this.worldMeshes.sky) r.drawSkyDome(this.worldMeshes.sky, this.camPos);
 
-    // Static Tokyo World
+    // Static Photorealistic Tokyo World
     r.drawMesh(this.worldMeshes.ground, null, null, 0.05);
     r.drawMesh(this.worldMeshes.road, null, r.roadTex, wetness, brakeGlow);
     r.drawMesh(this.worldMeshes.buildings, null, r.bldgTex, 0.15);
-    r.drawMesh(this.worldMeshes.env, null, null, 0.2);
+    r.drawMesh(this.worldMeshes.env, null, null, 0.22);
 
     // Parked JDM Car Meet Vehicles
     for (let i = 0; i < this.world.meetCars.length; i++) {
       const mc = this.world.meetCars[i];
       Mat4.fromTRS(this.tmpMat, mc.x, mc.y, mc.z, 0, mc.yaw, 0, 1, 1, 1);
-      r.drawMesh(this.meetCarMeshes[i], this.tmpMat, null, 0.65);
+      r.drawMesh(this.meetCarMeshes[i], this.tmpMat, null, 0.72);
     }
 
-    // Skid marks on road
     if (this.sim) r.drawSkids(this.sim.skids);
 
-    // Player 3D JDM Car
+    // Player 3D Curved Car
     Mat4.fromTRS(this.tmpMat, carX, carY, carZ, carPitch, carYaw, carRoll, 1, 1, 1);
-    r.drawMesh(this.playerMesh, this.tmpMat, null, 0.85, braking ? 0.55 : 0.0);
+    r.drawMesh(this.playerMesh, this.tmpMat, null, 0.90, brakeGlow);
 
-    // AI Opponents & Traffic
+    // Collect Additive Volumetric Glow Halos (LED Taillights, Xenon Headlights, Nearby Streetlamps!)
+    const halos = [];
+    const fx = Math.sin(carYaw), fz = Math.cos(carYaw);
+    const lx = Math.cos(carYaw), lz = -Math.sin(carYaw);
+    const tailScale = braking ? 1.55 : 1.15;
+    // Player Left & Right Crimson LED Taillight Glow Halos
+    halos.push({ x: carX - fx * 2.34 + lx * 0.62, y: carY + 0.78, z: carZ - fz * 2.34 + lz * 0.62, r: 1.0, g: 0.14, b: 0.08, a: 0.85, size: tailScale });
+    halos.push({ x: carX - fx * 2.34 - lx * 0.62, y: carY + 0.78, z: carZ - fz * 2.34 - lz * 0.62, r: 1.0, g: 0.14, b: 0.08, a: 0.85, size: tailScale });
+    // Player Left & Right Xenon White Headlight Glow Halos
+    halos.push({ x: carX + fx * 2.34 + lx * 0.64, y: carY + 0.62, z: carZ + fz * 2.34 + lz * 0.64, r: 0.92, g: 0.97, b: 1.0, a: 0.72, size: 1.25 });
+    halos.push({ x: carX + fx * 2.34 - lx * 0.64, y: carY + 0.62, z: carZ + fz * 2.34 - lz * 0.64, r: 0.92, g: 0.97, b: 1.0, a: 0.72, size: 1.25 });
+
+    // Nearby Streetlamp Atmospheric Rain Halos
+    for (let i = 0; i < this.world.lamps.length; i++) {
+      const lm = this.world.lamps[i];
+      const dx = lm.x - this.camPos[0], dz = lm.z - this.camPos[2];
+      if (dx * dx + dz * dz < 165 * 165) {
+        halos.push({ x: lm.x, y: lm.y + 8.1, z: lm.z, r: 1.0, g: 0.94, b: 0.82, a: 0.48, size: 2.3 });
+      }
+    }
+
+    // AI Opponents & Traffic + their realistic headlights/taillights halos
     if (this.sim) {
       for (let i = 0; i < this.sim.aiCars.length; i++) {
         const ai = this.sim.aiCars[i];
         Mat4.fromTRS(this.tmpMat, ai.x, ai.y, ai.z, ai.pitch, ai.yaw, ai.roll, 1, 1, 1);
-        r.drawMesh(this.aiMeshes[i], this.tmpMat, null, 0.75, ai.braking ? 0.45 : 0);
+        r.drawMesh(this.aiMeshes[i], this.tmpMat, null, 0.82, ai.braking ? 0.55 : 0);
+        const afx = Math.sin(ai.yaw), afz = Math.cos(ai.yaw);
+        halos.push({ x: ai.x - afx * 2.25, y: ai.y + 0.76, z: ai.z - afz * 2.25, r: 1.0, g: 0.12, b: 0.08, a: 0.75, size: 1.35 });
       }
       for (const tv of this.sim.traffic) {
         Mat4.fromTRS(this.tmpMat, tv.x, tv.y, tv.z, tv.pitch, tv.yaw, 0, 1, 1, 1);
-        r.drawMesh(this.trafficMesh, this.tmpMat, null, 0.45);
+        r.drawMesh(this.trafficMesh, this.tmpMat, null, 0.55);
+        const tfx = Math.sin(tv.yaw), tfz = Math.cos(tv.yaw);
+        halos.push({ x: tv.x - tfx * 2.2, y: tv.y + 0.74, z: tv.z - tfz * 2.2, r: 1.0, g: 0.12, b: 0.10, a: 0.65, size: 1.1 });
+        halos.push({ x: tv.x + tfx * 2.2, y: tv.y + 0.64, z: tv.z + tfz * 2.2, r: 0.95, g: 0.97, b: 1.0, a: 0.65, size: 1.2 });
       }
-      // 3D Smoke, Sparks, Nitro Flames & Rain
-      r.drawParticles(this.sim.particles);
+      // Volumetric White Tire Smoke & Rain
+      r.drawParticles(this.sim.particles, false);
+    } else {
+      // Showcase dramatic tire smoke mist swirling around the rear wheels on wet Shibuya Crossing!
+      const t = r.time;
+      const mist = [];
+      for (let m = 0; m < 10; m++) {
+        const ph = (t * 0.7 + m * 0.63) % 1.0;
+        const side = (m % 2 === 0 ? 0.92 : -0.92);
+        mist.push({
+          x: carX - fx * (1.35 + ph * 2.1) + lx * (side + Math.sin(t + m) * 0.35),
+          y: carY + 0.25 + ph * 0.85,
+          z: carZ - fz * (1.35 + ph * 2.1) + lz * (side + Math.cos(t + m) * 0.35),
+          r: 0.88, g: 0.91, b: 0.96, a: 0.32 * (1 - ph), size: 1.3 + ph * 2.2
+        });
+      }
+      r.drawParticles(mist, false);
     }
+
+    // Additive LED & Streetlamp Glow Halos
+    if (gfxOpts.dynamicLights) r.drawParticles(halos, true);
+
+    // 4-Pass FBO Selective Bloom + ACES Filmic Tone Mapping Composite!
+    r.endFrame();
   }
 
   _updateHUD() {

@@ -17,10 +17,9 @@ function createDefaultSave() {
   const cars = {};
   CARS.forEach((c, idx) => {
     cars[c.id] = {
-      // Tier 1 (Simples) unlocked by default so player progresses from simple to hypercar (with Test Drive available for all!)
-      unlocked: idx === 0,
+      unlocked: idx === 0 || c.id === 'shogun',
       paint: c.defaultPaint,
-      rim: c.defaultRim || 'te37',
+      rim: c.defaultRim || 'steel',
       wing: c.defaultWing,
       suspension: idx === 0 ? 'stock' : 'sport',
       driftSetup: 'balanced',
@@ -31,7 +30,7 @@ function createDefaultSave() {
 
   return {
     yen: 8500,
-    selectedCar: CARS[0].id,
+    selectedCar: 'shogun',
     selectedTrack: 'shibuya',
     selectedMode: 'drift_challenge',
     weather: 'rain',
@@ -53,13 +52,13 @@ function createDefaultSave() {
       tiltDeadzone: 3.5,
       tiltCenter: 0,
       tiltInvert: false,
-      quality: 'auto',         // 'auto' | 'ultra' | 'high' | 'medium' | 'low' | 'custom'
-      resScale: 1.0,           // 0.5 .. 1.0
-      reflections: 'high',     // 'high' | 'medium' | 'off'
+      quality: 'auto',
+      resScale: 1.0,
+      reflections: 'high',
       dynamicLights: true,
-      particleDensity: 1.0,    // 0.0 .. 1.0
-      drawDistance: 520,       // 260 | 380 | 520
-      visualStyle: 'realistic', // 'realistic' (Estilo 1) | 'neon' | 'cyberpunk'
+      particleDensity: 1.0,
+      drawDistance: 520,
+      visualStyle: 'realistic',
       showFps: true,
       sfxEnabled: true,
       musicEnabled: true,
@@ -89,9 +88,11 @@ export class SaveManager {
         leaderboard: Array.isArray(parsed.leaderboard) ? parsed.leaderboard : [],
         claimedChallenges: parsed.claimedChallenges || {}
       };
-      if (!merged.settings.photorealDefaultApplied) {
+      if (!merged.settings.photorealHeroV4) {
         merged.settings.visualStyle = 'realistic';
-        merged.settings.photorealDefaultApplied = true;
+        merged.settings.photorealHeroV4 = true;
+        merged.cars.shogun.unlocked = true;
+        merged.selectedCar = 'shogun';
       }
       for (const c of CARS) {
         if (parsed.cars && parsed.cars[c.id]) {

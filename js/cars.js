@@ -147,7 +147,7 @@ export const CARS = [
     price: 38000,
     style: 'gtr',
     defaultPaint: 'wangan',
-    defaultRim: 'te37',
+    defaultRim: 'steel',
     defaultWing: 'gt',
     defaultKit: 'wide',
     length: 4.58, width: 1.98, height: 1.27,
