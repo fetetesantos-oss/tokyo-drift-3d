@@ -350,6 +350,9 @@ class TokyoDriftApp {
       if (e.code === 'KeyC' && this.state === 'racing') {
         this._triggerCalibrationToast();
       }
+      if (e.code === 'KeyF') {
+        this._toggleFullscreen();
+      }
       if (e.code === 'KeyM') {
         this.settings.sfxEnabled = !this.settings.sfxEnabled;
         this.settings.musicEnabled = this.settings.sfxEnabled;
@@ -358,6 +361,14 @@ class TokyoDriftApp {
         this._syncSettingsUI();
       }
     });
+
+    const onFsChange = () => {
+      this._syncFullscreenUI();
+      this._applyQualityProfile();
+      this._checkOrientationGuard();
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
 
     // Drag to orbit 3D car in Menu / Garage, OR touch & hold anywhere on screen to accelerate while racing!
     this._screenGasPointers = new Set();
@@ -400,7 +411,7 @@ class TokyoDriftApp {
 
     // Portrait Guard Buttons
     document.getElementById('btnForceLandscape')?.addEventListener('click', () => {
-      this.controls.requestLandscapeLock();
+      this._toggleFullscreen(true);
     });
     document.getElementById('btnIgnorePortrait')?.addEventListener('click', () => {
       this.portraitDismissed = true;
@@ -422,6 +433,9 @@ class TokyoDriftApp {
     document.getElementById('btnMenuNextCar')?.addEventListener('click', () => cycleMenuCar(1));
     document.getElementById('btnMenuRev')?.addEventListener('click', () => this._previewSelectedCarSound());
     document.getElementById('btnGarageRev')?.addEventListener('click', () => this._previewSelectedCarSound());
+    document.getElementById('btnFullscreen')?.addEventListener('click', () => this._toggleFullscreen());
+    document.getElementById('btnGarageFullscreen')?.addEventListener('click', () => this._toggleFullscreen());
+    document.getElementById('btnHudFullscreen')?.addEventListener('click', () => this._toggleFullscreen());
     document.getElementById('btnOpenGarage').onclick = () => {
       this.audio.init();
       this.state = 'garage';
@@ -606,15 +620,55 @@ class TokyoDriftApp {
     setChk('chkShowFps', s.showFps !== false);
   }
 
+  _showToast(msg, ms = 2200) {
+    const toast = document.getElementById('toastBanner');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.remove('hidden');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => toast.classList.add('hidden'), ms);
+  }
+
+  _syncFullscreenUI() {
+    const active = this.controls.isFullscreen() || document.body.classList.contains('fs-expanded');
+    const menuBtn = document.getElementById('btnFullscreen');
+    if (menuBtn) menuBtn.textContent = active ? '✕ Sair Tela Cheia' : '⛶ Tela Cheia';
+    const garBtn = document.getElementById('btnGarageFullscreen');
+    if (garBtn) garBtn.textContent = active ? '✕' : '⛶';
+    const hudBtn = document.getElementById('btnHudFullscreen');
+    if (hudBtn) hudBtn.textContent = active ? '✕' : '⛶';
+  }
+
+  async _toggleFullscreen(forceEnter = false) {
+    const res = forceEnter
+      ? { ok: await this.controls.requestLandscapeLock(), active: this.controls.isFullscreen() }
+      : await this.controls.toggleFullscreen();
+
+    if (res.ok) {
+      document.body.classList.remove('fs-expanded');
+      this._showToast(res.active ? '⛶ Tela Cheia Horizontal Ativada!' : 'Tela Cheia Encerrada', 1600);
+    } else {
+      // Fallback if running inside a sandboxed preview iframe that restricts Fullscreen API:
+      // expand the inline viewport as much as possible and offer direct full-window experience!
+      const expanded = forceEnter ? true : !document.body.classList.contains('fs-expanded');
+      document.body.classList.toggle('fs-expanded', expanded);
+      this._showToast(
+        expanded
+          ? '⛶ Modo Expandido Ativado! (Para tela cheia total, use o link online)'
+          : 'Tamanho padrão restaurado',
+        2600
+      );
+    }
+    this._syncFullscreenUI();
+    this._applyQualityProfile();
+    this._checkOrientationGuard();
+  }
+
   _triggerCalibrationToast() {
     const deg = this.controls.calibrateCenter();
     this.save.save();
     this._syncSettingsUI();
-    const toast = document.getElementById('toastBanner');
-    toast.textContent = `✓ Centro do Giroscópio Calibrado (${deg.toFixed(1)}°)`;
-    toast.classList.remove('hidden');
-    clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => toast.classList.add('hidden'), 2000);
+    this._showToast(`✓ Centro do Giroscópio Calibrado (${deg.toFixed(1)}°)`, 2000);
   }
 
   _checkOrientationGuard() {

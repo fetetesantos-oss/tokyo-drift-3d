@@ -81,15 +81,44 @@ export class ControlManager {
     }
   }
 
+  isFullscreen() {
+    return !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+  }
+
   async requestLandscapeLock() {
+    let fsOk = false;
     try {
-      if (document.documentElement.requestFullscreen && this.isTouchDevice && !document.fullscreenElement) {
-        await document.documentElement.requestFullscreen().catch(() => {});
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (req && !this.isFullscreen()) {
+        await Promise.resolve(req.call(el)).then(() => { fsOk = true; }).catch(() => {});
+      } else if (this.isFullscreen()) {
+        fsOk = true;
       }
       if (screen.orientation && screen.orientation.lock) {
         await screen.orientation.lock('landscape').catch(() => {});
       }
     } catch {}
+    return fsOk;
+  }
+
+  async toggleFullscreen() {
+    try {
+      if (this.isFullscreen()) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if (exit) await Promise.resolve(exit.call(document)).catch(() => {});
+        return { ok: true, active: false };
+      }
+      const ok = await this.requestLandscapeLock();
+      return { ok, active: ok || this.isFullscreen() };
+    } catch {
+      return { ok: false, active: false };
+    }
   }
 
   async requestSensorPermission() {
