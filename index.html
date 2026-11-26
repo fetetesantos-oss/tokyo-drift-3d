@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#050710" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="screen-orientation" content="landscape" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="style.css" />
+  <title>TOKYO DRIFT 3D | Mobile</title>
+</head>
+<body>
+  <canvas id="glCanvas"></canvas>
+
+  <!-- Toast Notification (Sensor Calibration etc.) -->
+  <div id="toastBanner" class="hidden"></div>
+
+  <!-- ==================== PORTRAIT ORIENTATION GUARD ==================== -->
+  <div id="portraitGuard" class="hidden">
+    <div class="rotate-phone"></div>
+    <h2 style="margin:0; font-style:italic;" class="neon-pink">GIRE O CELULAR PARA HORIZONTAL</h2>
+    <p style="margin:0; font-size:13px; color:#cbd5e1; max-width:320px;">
+      <strong>TOKYO DRIFT 3D</strong> funciona exclusivamente em modo horizontal (<em>Landscape</em>) para melhor controle por inclinação e visão da pista.
+    </p>
+    <div style="display:flex; gap:10px; margin-top:6px;">
+      <button id="btnForceLandscape" class="btn btn-primary">TRAVAR HORIZONTAL</button>
+      <button id="btnIgnorePortrait" class="btn">Continuar (Desktop)</button>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN MENU ==================== -->
+  <div id="menuScreen" class="safe-pad">
+    <div class="menu-header">
+      <div>
+        <div class="brand-sub neon-cyan">東京ドリフト 3D • MOBILE WEBGL</div>
+        <h1 class="brand-title">TOKYO <span style="color:var(--pink)" class="neon-pink">DRIFT 3D</span></h1>
+      </div>
+      <div class="top-actions">
+        <span id="menuYen" class="yen-badge">¥ 8.500</span>
+        <button id="btnOpenGarage" class="btn btn-cyan">🔧 Garagem 3D</button>
+        <button id="btnOpenGraphics" class="btn">🎨 Gráficos</button>
+        <button id="btnOpenRanking" class="btn">🏆 Ranking</button>
+        <button id="btnOpenSettings" class="btn">⚙ Sensor &amp; Áudio</button>
+      </div>
+    </div>
+
+    <div class="menu-body">
+      <div class="glass menu-panel">
+        <div>
+          <span class="sec-label">1. Modo de Jogo</span>
+          <div id="modeGrid" class="grid-3"></div>
+        </div>
+        <div>
+          <span class="sec-label">2. Circuito de Tóquio</span>
+          <div id="trackGrid" class="grid-2"></div>
+        </div>
+        <div>
+          <span class="sec-label">3. Clima &amp; Iluminação</span>
+          <div id="weatherRow" class="chip-row"></div>
+        </div>
+      </div>
+
+      <div class="menu-right-cta">
+        <div class="glass active-car-chip" style="min-width:240px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <button id="btnMenuPrevCar" class="hud-mini-btn" title="Carro Anterior">◀</button>
+            <div style="text-align:center; flex:1;">
+              <div id="menuCarTier" class="pill-cyan" style="display:inline-block; margin-bottom:2px;">TIER 1 • SIMPLES</div>
+              <div><strong id="menuActiveCar" style="color:#fff">Mira Civic-K 94</strong></div>
+            </div>
+            <button id="btnMenuNextCar" class="hud-mini-btn" title="Próximo Carro">▶</button>
+          </div>
+          <div style="font-size:10px; color:var(--muted); margin-top:4px; text-align:center;">Arraste para girar em 3D • 7 Tiers (Simples → Hipercarro)</div>
+        </div>
+        <button id="btnPlay" class="btn btn-primary">INICIAR CORRIDA →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 3D INTERACTIVE GARAGE ==================== -->
+  <div id="garageScreen" class="hidden safe-pad">
+    <div class="garage-top">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button id="btnGarageBack" class="btn">← Voltar</button>
+        <h2 style="margin:0; font-size:17px; font-style:italic;" class="neon-cyan">GARAGEM JDM 3D • SIMPLES AO TOP</h2>
+      </div>
+      <span id="garageYen" class="yen-badge">¥ 8.500</span>
+    </div>
+
+    <div class="garage-main">
+      <div class="glass garage-drawer">
+        <div>
+          <span id="gCarTier" class="pill-cyan" style="display:inline-block; margin-bottom:3px;">TIER 1 • SIMPLES</span>
+          <div id="gCarName" style="font-size:17px; font-weight:900;">Mira Civic-K 94</div>
+          <div id="gCarDesc" style="font-size:11px; color:var(--muted); margin-top:2px;"></div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-row">Velocidade<div class="stat-track"><div id="gBarSpeed" class="stat-fill"></div></div></div>
+          <div class="stat-row">Aceleração<div class="stat-track"><div id="gBarAccel" class="stat-fill"></div></div></div>
+          <div class="stat-row">Controle Drift<div class="stat-track"><div id="gBarDrift" class="stat-fill"></div></div></div>
+          <div class="stat-row">Nitro N2O<div class="stat-track"><div id="gBarNitro" class="stat-fill"></div></div></div>
+        </div>
+
+        <div id="gUnlockWrap" class="hidden" style="padding:8px 0; display:flex; flex-direction:column; gap:6px;">
+          <button id="btnBuyCar" class="btn btn-primary" style="width:100%;">DESBLOQUEAR</button>
+          <button id="btnTestDrive" class="btn btn-cyan" style="width:100%;">⚡ TEST DRIVE GRÁTIS (DRIFT LIVRE)</button>
+        </div>
+
+        <div id="gCustomWrap" style="display:flex; flex-direction:column; gap:9px;">
+          <div>
+            <span class="sec-label">Pintura &amp; Neon Underglow</span>
+            <div id="gPaintRow" class="swatch-row"></div>
+          </div>
+          <div>
+            <span class="sec-label">Rodas</span>
+            <div id="gRimRow" class="chip-row"></div>
+          </div>
+          <div>
+            <span class="sec-label">Aerofólio</span>
+            <div id="gWingRow" class="chip-row"></div>
+          </div>
+          <div>
+            <span class="sec-label">Body Kit</span>
+            <div id="gKitRow" class="chip-row"></div>
+          </div>
+          <div>
+            <span class="sec-label">Suspensão</span>
+            <div id="gSuspRow" class="chip-row"></div>
+          </div>
+          <div>
+            <span class="sec-label">Configuração de Drift</span>
+            <div id="gSetupRow" class="chip-row"></div>
+          </div>
+          <div>
+            <span class="sec-label">Upgrades Mecânicos</span>
+            <div id="gUpgradeList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="garage-bottom">
+      <div id="garageCarList" class="car-tabs"></div>
+      <button id="btnGarageRace" class="btn btn-primary">CORRER →</button>
+    </div>
+  </div>
+
+  <!-- ==================== IN-GAME LANDSCAPE HUD ==================== -->
+  <div id="hudLayer" class="hidden safe-pad">
+    <div class="hud-top">
+      <!-- Score & Lap -->
+      <div class="glass hud-score-card">
+        <div style="font-size:10px; font-weight:800; color:var(--muted); letter-spacing:0.12em;">DRIFT PTS</div>
+        <div id="hudScore" class="hud-score-val">0</div>
+        <div class="hud-meta-row">
+          <span id="hudLap">Volta 1</span>
+          <span id="hudRivalScore" class="hidden">RIVAL: 0</span>
+        </div>
+      </div>
+
+      <!-- Center: Position, Timer & Active Drift Combo -->
+      <div class="hud-center">
+        <div class="glass hud-timer-pill">
+          <span id="hudPosWrap" class="hidden"><strong id="hudPos">1º/4</strong></span>
+          <span id="hudTimer">02:00</span>
+        </div>
+
+        <div id="tiltIndicatorWrap" class="hidden">
+          <div class="tilt-bar">
+            <div class="tilt-center-mark"></div>
+            <div id="tiltNeedle" style="left:50%"></div>
+          </div>
+        </div>
+
+        <div id="hudDriftBox">
+          <div class="drift-nums">
+            <span id="hudDriftPts" class="neon-amber">+0</span>
+            <span id="hudDriftMult" class="neon-pink">×1.0</span>
+          </div>
+          <div class="grace-track"><div id="hudGraceBar" style="width:100%"></div></div>
+        </div>
+        <div id="hudCallout" class="neon-cyan"></div>
+      </div>
+
+      <!-- Top Right: Controls & Minimap -->
+      <div class="hud-top-right">
+        <div class="hud-icon-row">
+          <span id="hudFps" class="glass">60 FPS</span>
+          <button id="btnHudCalib" class="hud-mini-btn" title="Calibrar Centro do Giroscópio (C)">◎ Calibrar</button>
+          <button id="btnHudReset" class="hud-mini-btn" title="Reposicionar na Pista (R)">↺</button>
+          <button id="btnHudSettings" class="hud-mini-btn" title="Ajustes">⚙</button>
+          <button id="btnHudPause" class="hud-mini-btn" title="Pausar (Esc)">⏸</button>
+        </div>
+        <canvas id="minimapCanvas" width="124" height="90"></canvas>
+      </div>
+    </div>
+
+    <div id="hudCountdown" class="hidden">3</div>
+
+    <div class="hud-bottom">
+      <!-- Left: Fallback Touch Steering Buttons (auto-shown if tilt unavailable or selected) -->
+      <div id="touchSteerPad" class="touch-cluster hidden">
+        <button id="tLeft" class="touch-btn">◀</button>
+        <button id="tRight" class="touch-btn">▶</button>
+      </div>
+
+      <!-- Center/Left: Digital Speedometer & Nitro Cluster -->
+      <div class="glass cluster-card">
+        <div>
+          <div style="display:flex; align-items:baseline; gap:5px;">
+            <span id="hudSpeed" class="speed-num">0</span>
+            <span class="speed-unit">KM/H</span>
+          </div>
+          <div class="bar-mini"><div id="hudRpmBar" style="width:20%"></div></div>
+          <div style="display:flex; align-items:center; gap:5px; margin-top:4px;">
+            <span style="font-size:9px; font-weight:900; color:var(--cyan);">N2O</span>
+            <div class="bar-mini" style="margin-top:0; width:82px;"><div id="hudNitroBar" style="width:100%"></div></div>
+          </div>
+        </div>
+        <div class="gear-col">
+          <div style="font-size:9px; color:var(--muted); font-weight:800;">MARCHA</div>
+          <div id="hudGear" class="neon-pink">1</div>
+          <div id="hudAngle">0°</div>
+        </div>
+      </div>
+
+      <!-- Right: Ergonomic Landscape Pedals (Gas, Brake, Handbrake Drift, Nitro) -->
+      <div id="touchPedalPad" class="touch-cluster hidden">
+        <div class="pedal-grid">
+          <button id="tNitro" class="touch-btn nitro">⚡<span style="font-size:9px;">NITRO</span></button>
+          <button id="tDrift" class="touch-btn drift">🔥<span style="font-size:9px;">DRIFT</span></button>
+          <button id="tBrake" class="touch-btn brake">FREIO</button>
+          <button id="tGas" class="touch-btn gas">ACEL</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAUSE MODAL ==================== -->
+  <div id="pauseModal" class="modal-backdrop hidden">
+    <div class="glass modal-card" style="text-align:center;">
+      <div class="modal-head">
+        <h2>CORRIDA PAUSADA</h2>
+        <span class="pill-cyan">TOKYO DRIFT 3D</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button id="btnPauseResume" class="btn btn-primary">CONTINUAR CORRIDA</button>
+        <button id="btnPauseRestart" class="btn">↺ Reiniciar Corrida</button>
+        <button id="btnPauseCalib" class="btn btn-cyan">◎ Calibrar Ponto Central do Giroscópio</button>
+        <button id="btnPauseGraphics" class="btn">🎨 Opções Gráficas (Ultra / Realista / Leve)</button>
+        <button id="btnPauseSettings" class="btn">⚙ Sensibilidade, Controles &amp; Áudio</button>
+        <button id="btnPauseMenu" class="btn">Voltar ao Menu Principal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GRAPHICS OPTIONS MODAL ==================== -->
+  <div id="graphicsModal" class="modal-backdrop hidden">
+    <div class="glass modal-card">
+      <div class="modal-head">
+        <h2>OPÇÕES GRÁFICAS 3D</h2>
+        <button id="btnCloseGraphics" class="btn">✕</button>
+      </div>
+
+      <span class="sec-label">Perfil Rápido (Presets)</span>
+      <div id="gfxPresetRow" class="chip-row" style="margin-bottom:10px;">
+        <button class="chip-btn" data-preset="auto">⚡ Auto 60 FPS</button>
+        <button class="chip-btn" data-preset="ultra">💎 Ultra</button>
+        <button class="chip-btn" data-preset="high">✨ Alto</button>
+        <button class="chip-btn" data-preset="medium">⚖ Médio</button>
+        <button class="chip-btn" data-preset="low">🔋 Leve</button>
+      </div>
+
+      <div class="setting-row">
+        <span>Estilo Visual / Filtro de Cor</span>
+        <select id="selVisualStyle">
+          <option value="realistic">Fotorrealista Noturno (Shibuya Chuva)</option>
+          <option value="neon">Tóquio Neon Clássico</option>
+          <option value="cyberpunk">Cyberpunk Neon Intenso</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <span>Resolução 3D (<strong id="valResScale">100%</strong>)</span>
+        <input id="rngResScale" type="range" min="0.5" max="1.0" step="0.05" value="1.0" />
+      </div>
+
+      <div class="setting-row">
+        <span>Reflexos Clearcoat &amp; Asfalto Molhado</span>
+        <select id="selReflections">
+          <option value="high">Alto (Lataria + Pista + Vidros)</option>
+          <option value="medium">Médio (Balanceado)</option>
+          <option value="off">Desligado (Máximo FPS)</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <span>Iluminação Dinâmica (Faróis, Freio &amp; Underglow)</span>
+        <input id="chkDynamicLights" type="checkbox" checked />
+      </div>
+
+      <div class="setting-row">
+        <span>Partículas: Fumaça, Faíscas e Chuva (<strong id="valParticles">100%</strong>)</span>
+        <input id="rngParticles" type="range" min="0" max="1" step="0.1" value="1.0" />
+      </div>
+
+      <div class="setting-row">
+        <span>Distância de Visão (Horizonte)</span>
+        <select id="selDrawDistance">
+          <option value="520">Longa (520m • Cidade Completa)</option>
+          <option value="380">Média (380m • Balanceada)</option>
+          <option value="260">Curta (260m • Economia)</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <span>Mostrar Contador de FPS na Tela</span>
+        <input id="chkShowFps" type="checkbox" checked />
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SETTINGS & SENSOR CALIBRATION MODAL ==================== -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="glass modal-card">
+      <div class="modal-head">
+        <h2>CONTROLES, GIROSCÓPIO &amp; ÁUDIO</h2>
+        <button id="btnCloseSettings" class="btn">✕</button>
+      </div>
+
+      <div class="gyro-box">
+        <div id="gyroStatus">Verificando sensor de inclinação...</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button id="btnEnableGyro" class="btn btn-cyan">📱 Ativar Giroscópio (iOS/Android)</button>
+          <button id="btnCalibrateCenter" class="btn">◎ Calibrar Centro</button>
+          <button id="btnResetCenter" class="btn">Zerar (0°)</button>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <span>Modo de Direção</span>
+        <select id="selControlMode">
+          <option value="auto">Automático (Inclinação + Fallback)</option>
+          <option value="tilt">Inclinação do Celular (Giroscópio)</option>
+          <option value="buttons">Botões na Tela (Toque)</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <span>Sensibilidade da Inclinação (<strong id="valSensitivity">1.35×</strong>)</span>
+        <input id="rngSensitivity" type="range" min="0.5" max="2.5" step="0.05" value="1.35" />
+      </div>
+
+      <div class="setting-row">
+        <span>Zona Morta Central (<strong id="valDeadzone">3.5°</strong>)</span>
+        <input id="rngDeadzone" type="range" min="0" max="10" step="0.5" value="3.5" />
+      </div>
+
+      <div class="setting-row">
+        <span>Inverter Eixo de Inclinação</span>
+        <input id="chkInvertTilt" type="checkbox" />
+      </div>
+
+      <div class="setting-row">
+        <span>Qualidade Gráfica</span>
+        <select id="selQuality">
+          <option value="auto">Auto (Adaptativo 60 FPS)</option>
+          <option value="ultra">Ultra (Máximo Realismo)</option>
+          <option value="high">Alto (Reflexos + Full DPR)</option>
+          <option value="medium">Médio (Equilibrado)</option>
+          <option value="low">Leve (Economia de Bateria)</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <span>Tráfego Noturno nas Ruas</span>
+        <input id="chkTraffic" type="checkbox" checked />
+      </div>
+
+      <div class="setting-row">
+        <span>Efeitos Sonoros (Motor, Pneus, Turbo)</span>
+        <input id="chkSfx" type="checkbox" checked />
+      </div>
+
+      <div class="setting-row">
+        <span>Trilha Eletrônica Noturna</span>
+        <input id="chkMusic" type="checkbox" checked />
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== RANKING & CHALLENGES MODAL ==================== -->
+  <div id="rankingModal" class="modal-backdrop hidden">
+    <div class="glass modal-card">
+      <div class="modal-head">
+        <h2>RANKING &amp; DESAFIOS PROGRESSIVOS</h2>
+        <button id="btnCloseRanking" class="btn">✕</button>
+      </div>
+      <span class="sec-label">Desafios de Tóquio (Recompensas em ¥)</span>
+      <div id="challengesList" style="margin-bottom:12px;"></div>
+      <span class="sec-label">Melhores Pontuações de Drift</span>
+      <div id="leaderboardList"></div>
+    </div>
+  </div>
+
+  <!-- ==================== RESULTS MODAL ==================== -->
+  <div id="resultsModal" class="modal-backdrop hidden">
+    <div class="glass modal-card" style="text-align:center;">
+      <div id="resSub" style="font-size:11px; color:var(--cyan); font-weight:800; letter-spacing:0.14em;">FIM DE CORRIDA</div>
+      <h2 id="resTitle" style="margin:4px 0 10px; font-size:24px; font-style:italic;" class="neon-pink">RESULTADO</h2>
+
+      <div style="display:inline-flex; align-items:center; justify-content:center; width:64px; height:64px; border-radius:16px; background:linear-gradient(135deg, var(--pink), var(--amber)); font-size:28px; font-weight:900; font-style:italic; margin-bottom:8px;">
+        <span id="resGrade">S</span>
+      </div>
+
+      <div id="resBadges"></div>
+
+      <div class="res-grid">
+        <div class="res-tile"><span>Pontuação</span><strong id="resScore">0</strong></div>
+        <div class="res-tile"><span>Maior Combo</span><strong id="resCombo" style="color:var(--pink)">0</strong></div>
+        <div class="res-tile"><span>Apex Clips</span><strong id="resClips" style="color:var(--cyan)">0</strong></div>
+        <div class="res-tile"><span>Recompensa</span><strong id="resYen" style="color:var(--amber)">+¥ 0</strong></div>
+      </div>
+
+      <div style="display:flex; gap:8px; justify-content:center; margin-top:10px;">
+        <button id="btnResRestart" class="btn btn-primary">CORRER NOVAMENTE</button>
+        <button id="btnResGarage" class="btn btn-cyan">🔧 Garagem</button>
+        <button id="btnResMenu" class="btn">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
