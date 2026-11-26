@@ -102,7 +102,7 @@ export class TokyoAudioEngine {
       this.sfxBus.connect(comp);
 
       this.musicBus = this.ctx.createGain();
-      this.musicBus.gain.value = this.settings.musicEnabled ? 0.16 : 0;
+      this.musicBus.gain.value = this.settings.musicEnabled ? 0.26 : 0;
       this.musicBus.connect(comp);
 
       // Build white & warm pink/brown noise buffers for exhaust air rush, pops, tire scrub & rain spray
@@ -290,7 +290,7 @@ export class TokyoAudioEngine {
     if (!this.initialized || !this.ctx) return;
     const t = this.ctx.currentTime;
     this.sfxBus.gain.setTargetAtTime(this.settings.sfxEnabled ? 0.42 : 0, t, 0.05);
-    this.musicBus.gain.setTargetAtTime(this.settings.musicEnabled ? 0.16 : 0, t, 0.08);
+    this.musicBus.gain.setTargetAtTime(this.settings.musicEnabled ? 0.26 : 0, t, 0.08);
   }
 
   updateVehicle({ rpm, gear, slip, nitro, throttle, engineType = 'rb26_twin', hasTurbo = true, speed = 0, weather = 'rain', active }) {
@@ -581,56 +581,163 @@ export class TokyoAudioEngine {
     }
   }
 
-  // Subtle Original Tokyo Midnight Electronic Groove (sits cleanly under the realistic engine roar)
+  // 100% Original 90 BPM Early-2000s Smooth Hip-Hop / R&B Night-Drive Beat
+  // Punchy boom-bap kick, layered snare+clap, swung 16th hi-hats, deep warm sub-bass & soft nylon-plucked minor chords
   _startMusicSequencer() {
-    const bassSeq = [55, 55, 65.41, 55, 73.42, 65.41, 49, 55];
-    const leadSeq = [440, 0, 523.25, 0, 587.33, 523.25, 493.88, 0, 440, 0, 659.25, 0, 587.33, 0, 523.25, 440];
+    // Original 4-bar minor night-drive harmony: Dm7 -> Bbmaj7 -> Gm7 -> A7sus4
+    const bassRoots = [73.42, 58.27, 49.00, 55.00]; // D2, Bb1, G1, A1
+    const chords = [
+      [293.66, 349.23, 440.00, 523.25], // Dm7
+      [233.08, 293.66, 349.23, 440.00], // Bbmaj7
+      [196.00, 233.08, 293.66, 349.23], // Gm7
+      [220.00, 293.66, 329.63, 392.00]  // A7sus4
+    ];
+
+    const playKick = (t, vel = 1.0) => {
+      const k = this.ctx.createOscillator();
+      const kg = this.ctx.createGain();
+      k.type = 'sine';
+      k.frequency.setValueAtTime(142, t);
+      k.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+      kg.gain.setValueAtTime(0.46 * vel, t);
+      kg.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+      k.connect(kg); kg.connect(this.musicBus);
+      k.start(t); k.stop(t + 0.26);
+
+      // Tight beater punch click so the kick cuts through phone speakers
+      const c = this.ctx.createOscillator();
+      const cg = this.ctx.createGain();
+      c.type = 'triangle';
+      c.frequency.setValueAtTime(320, t);
+      c.frequency.exponentialRampToValueAtTime(75, t + 0.025);
+      cg.gain.setValueAtTime(0.14 * vel, t);
+      cg.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+      c.connect(cg); cg.connect(this.musicBus);
+      c.start(t); c.stop(t + 0.035);
+    };
+
+    const playSnareClap = (t) => {
+      // Snare body
+      const body = this.ctx.createOscillator();
+      const bg = this.ctx.createGain();
+      body.type = 'triangle';
+      body.frequency.setValueAtTime(205, t);
+      body.frequency.exponentialRampToValueAtTime(118, t + 0.09);
+      bg.gain.setValueAtTime(0.20, t);
+      bg.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+      body.connect(bg); bg.connect(this.musicBus);
+      body.start(t); body.stop(t + 0.12);
+
+      // Crisp snare snap + 2-tap layered handclap
+      [0, 0.014].forEach((offset, idx) => {
+        const src = this.ctx.createBufferSource();
+        src.buffer = this.noiseBuf;
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = idx === 0 ? 1750 : 2400;
+        bp.Q.value = idx === 0 ? 1.1 : 2.0;
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(idx === 0 ? 0.26 : 0.18, t + offset);
+        g.gain.exponentialRampToValueAtTime(0.001, t + offset + (idx === 0 ? 0.16 : 0.12));
+        src.connect(bp); bp.connect(g); g.connect(this.musicBus);
+        src.start(t + offset); src.stop(t + offset + 0.18);
+      });
+    };
+
+    const playHat = (t, open = false, vel = 1.0) => {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuf;
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = open ? 6800 : 8200;
+      const g = this.ctx.createGain();
+      const dur = open ? 0.22 : 0.045;
+      g.gain.setValueAtTime((open ? 0.11 : 0.085) * vel, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(hp); hp.connect(g); g.connect(this.musicBus);
+      src.start(t); src.stop(t + dur + 0.01);
+    };
+
+    const playSubBass = (t, freq, dur = 0.42) => {
+      const osc = this.ctx.createOscillator();
+      const flt = this.ctx.createBiquadFilter();
+      const g = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t);
+      flt.type = 'lowpass';
+      flt.frequency.setValueAtTime(240, t);
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.linearRampToValueAtTime(0.30, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(flt); flt.connect(g); g.connect(this.musicBus);
+      osc.start(t); osc.stop(t + dur + 0.02);
+    };
+
+    const playPluckChord = (t, notes, strum = 0.024, vel = 1.0) => {
+      notes.forEach((freq, i) => {
+        const st = t + i * strum;
+        const osc = this.ctx.createOscillator();
+        const flt = this.ctx.createBiquadFilter();
+        const g = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, st);
+        flt.type = 'lowpass';
+        flt.frequency.setValueAtTime(1900, st);
+        flt.frequency.exponentialRampToValueAtTime(480, st + 0.35);
+        g.gain.setValueAtTime(0.001, st);
+        g.gain.linearRampToValueAtTime(0.075 * vel, st + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.001, st + 0.48);
+        osc.connect(flt); flt.connect(g); g.connect(this.musicBus);
+        osc.start(st); osc.stop(st + 0.52);
+      });
+    };
+
+    // 90 BPM -> 16th note = 166.7ms
     this.musicInterval = setInterval(() => {
       if (!this.ctx || this.ctx.state !== 'running' || !this.settings.musicEnabled) return;
-      const t = this.ctx.currentTime;
-      const s = this.step % 16;
+      const step = this.step;
+      const s = step % 16;
+      const bar = Math.floor(step / 16) % 4;
+      // Subtle MPC-style 16th-note swing on odd 16th subdivisions
+      const swing = (s % 2 === 1) ? 0.018 : 0.0;
+      const t = this.ctx.currentTime + 0.02 + swing;
 
-      if (s % 4 === 0) {
-        const k = this.ctx.createOscillator();
-        const kg = this.ctx.createGain();
-        k.type = 'sine';
-        k.frequency.setValueAtTime(135, t);
-        k.frequency.exponentialRampToValueAtTime(36, t + 0.11);
-        kg.gain.setValueAtTime(0.28, t);
-        kg.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
-        k.connect(kg); kg.connect(this.musicBus);
-        k.start(t); k.stop(t + 0.15);
+      // Syncopated smooth hip-hop kick groove
+      const isBarOdd = (bar % 2 === 1);
+      if (s === 0) playKick(t, 1.0);
+      else if (!isBarOdd && s === 3) playKick(t, 0.72);
+      else if (s === 7) playKick(t, 0.85);
+      else if (s === 10) playKick(t, 0.95);
+      else if (isBarOdd && s === 14) playKick(t, 0.75);
+
+      // Crisp backbeat snare + clap on beats 2 & 4
+      if (s === 4 || s === 12) playSnareClap(t);
+
+      // Swung hi-hat groove with ghost accents & open-hat breath
+      if (s === 14 && isBarOdd) {
+        playHat(t, true, 0.95);
+      } else if (s % 2 === 0) {
+        playHat(t, false, (s % 4 === 0) ? 1.0 : 0.65);
+      } else if (s === 3 || s === 9 || s === 15) {
+        playHat(t, false, 0.42);
       }
 
-      if (s % 2 === 0) {
-        const bn = bassSeq[(s / 2) % bassSeq.length];
-        const b = this.ctx.createOscillator();
-        const bf = this.ctx.createBiquadFilter();
-        const bg = this.ctx.createGain();
-        b.type = 'sawtooth';
-        b.frequency.setValueAtTime(bn, t);
-        bf.type = 'lowpass';
-        bf.frequency.setValueAtTime(340, t);
-        bg.gain.setValueAtTime(0.14, t);
-        bg.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
-        b.connect(bf); bf.connect(bg); bg.connect(this.musicBus);
-        b.start(t); b.stop(t + 0.2);
+      // Warm sub-bass groove locked to kick pattern
+      const root = bassRoots[bar];
+      if (s === 0) playSubBass(t, root, 0.50);
+      else if (s === 7) playSubBass(t, root * 1.122, 0.30); // passing 2nd/fifth bounce
+      else if (s === 10) playSubBass(t, root, 0.42);
+
+      // Lush warm nylon/acoustic plucked chords on beat 1 and syncopated beat 3-and
+      if (s === 0) {
+        playPluckChord(t, chords[bar], 0.026, 1.0);
+      } else if (s === 6) {
+        playPluckChord(t, [chords[bar][2], chords[bar][3]], 0.018, 0.62);
+      } else if (s === 11 && isBarOdd) {
+        playPluckChord(t, [chords[bar][1], chords[bar][2], chords[bar][3]], 0.02, 0.55);
       }
 
-      if ((this.step % 64) >= 16) {
-        const ln = leadSeq[s];
-        if (ln > 0) {
-          const l = this.ctx.createOscillator();
-          const lg = this.ctx.createGain();
-          l.type = 'triangle';
-          l.frequency.setValueAtTime(ln, t);
-          lg.gain.setValueAtTime(0.06, t);
-          lg.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
-          l.connect(lg); lg.connect(this.musicBus);
-          l.start(t); l.stop(t + 0.14);
-        }
-      }
       this.step++;
-    }, 116);
+    }, 167);
   }
 }
