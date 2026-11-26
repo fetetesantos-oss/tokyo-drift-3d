@@ -62,7 +62,9 @@ export const CARS = [
       grip: 6.2,
       driftGrip: 2.1,
       nitroPower: 17,
-      enginePitch: 1.28
+      enginePitch: 1.0,
+      engineType: 'i4_vtec',
+      hasTurbo: false
     }
   },
   {
@@ -86,7 +88,9 @@ export const CARS = [
       grip: 6.0,
       driftGrip: 1.92,
       nitroPower: 20,
-      enginePitch: 1.20
+      enginePitch: 1.05,
+      engineType: 'i4_itb',
+      hasTurbo: false
     }
   },
   {
@@ -110,7 +114,9 @@ export const CARS = [
       grip: 6.3,
       driftGrip: 1.98,
       nitroPower: 23,
-      enginePitch: 1.15
+      enginePitch: 1.12,
+      engineType: 'rotary',
+      hasTurbo: true
     }
   },
   {
@@ -134,7 +140,9 @@ export const CARS = [
       grip: 6.4,
       driftGrip: 1.88,
       nitroPower: 25,
-      enginePitch: 0.88
+      enginePitch: 0.92,
+      engineType: 'i6_turbo',
+      hasTurbo: true
     }
   },
   {
@@ -158,7 +166,9 @@ export const CARS = [
       grip: 7.0,
       driftGrip: 2.12,
       nitroPower: 27,
-      enginePitch: 0.94
+      enginePitch: 0.96,
+      engineType: 'rb26_twin',
+      hasTurbo: true
     }
   },
   {
@@ -182,7 +192,9 @@ export const CARS = [
       grip: 7.2,
       driftGrip: 1.95,
       nitroPower: 30,
-      enginePitch: 1.06
+      enginePitch: 1.06,
+      engineType: 'v6_exotic',
+      hasTurbo: true
     }
   },
   {
@@ -206,7 +218,9 @@ export const CARS = [
       grip: 7.6,
       driftGrip: 1.85,
       nitroPower: 34,
-      enginePitch: 1.32
+      enginePitch: 1.25,
+      engineType: 'v12_f1',
+      hasTurbo: false
     }
   }
 ];
@@ -240,6 +254,8 @@ export function computeCarStats(carDef, carState) {
     grip,
     driftGrip,
     enginePitch: b.enginePitch,
+    engineType: b.engineType || 'rb26_twin',
+    hasTurbo: !!(b.hasTurbo || upg.turbo > 0),
     bars: {
       speed: Math.min(100, Math.round(((topSpeed - 52) / 56) * 100)),
       accel: Math.min(100, Math.round(((accel - 20) / 28) * 100)),

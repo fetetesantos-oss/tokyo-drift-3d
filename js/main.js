@@ -416,9 +416,12 @@ class TokyoDriftApp {
       this.save.save();
       this._rebuildPlayerMesh();
       this._renderAllMenus();
+      this._previewSelectedCarSound();
     };
     document.getElementById('btnMenuPrevCar')?.addEventListener('click', () => cycleMenuCar(-1));
     document.getElementById('btnMenuNextCar')?.addEventListener('click', () => cycleMenuCar(1));
+    document.getElementById('btnMenuRev')?.addEventListener('click', () => this._previewSelectedCarSound());
+    document.getElementById('btnGarageRev')?.addEventListener('click', () => this._previewSelectedCarSound());
     document.getElementById('btnOpenGarage').onclick = () => {
       this.audio.init();
       this.state = 'garage';
@@ -761,6 +764,14 @@ class TokyoDriftApp {
     });
   }
 
+  _previewSelectedCarSound() {
+    this.audio.init();
+    const carDef = CARS.find(c => c.id === this.save.data.selectedCar) || CARS[0];
+    const cs = this.save.getCarState(carDef.id);
+    const stats = computeCarStats(carDef, cs);
+    this.audio.playRevBlip(stats.engineType, stats.hasTurbo);
+  }
+
   _renderGarage() {
     document.getElementById('garageYen').textContent = `¥ ${this.save.data.yen.toLocaleString('pt-BR')}`;
 
@@ -778,6 +789,7 @@ class TokyoDriftApp {
         this.save.save();
         this._rebuildPlayerMesh();
         this._renderGarage();
+        this._previewSelectedCarSound();
       };
       list.appendChild(b);
     });
@@ -812,6 +824,7 @@ class TokyoDriftApp {
           cs.unlocked = true;
           this.save.save();
           this.audio.playSFX('bank');
+          this._previewSelectedCarSound();
           this._renderGarage();
         }
       };
@@ -870,6 +883,7 @@ class TokyoDriftApp {
             cs.upgrades[u.key] = lvl + 1;
             this.save.save();
             this.audio.playSFX('clip');
+            if (u.key === 'engine' || u.key === 'turbo') this._previewSelectedCarSound();
             this._renderGarage();
           }
         };
@@ -945,7 +959,10 @@ class TokyoDriftApp {
         slip: slipNorm,
         nitro: p.nitroActive,
         throttle: this.controls.throttle > 0,
-        enginePitch: this.sim.playerStats.enginePitch || 1.0,
+        engineType: this.sim.playerStats.engineType,
+        hasTurbo: this.sim.playerStats.hasTurbo,
+        speed: p.speed,
+        weather: this.save.data.weather,
         active: this.state === 'racing'
       });
 

@@ -63,16 +63,17 @@
       </div>
 
       <div class="menu-right-cta">
-        <div class="glass active-car-chip" style="min-width:240px;">
+        <div class="glass active-car-chip" style="min-width:250px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
             <button id="btnMenuPrevCar" class="hud-mini-btn" title="Carro Anterior">◀</button>
             <div style="text-align:center; flex:1;">
               <div id="menuCarTier" class="pill-cyan" style="display:inline-block; margin-bottom:2px;">TIER 1 • SIMPLES</div>
               <div><strong id="menuActiveCar" style="color:#fff">Mira Civic-K 94</strong></div>
             </div>
+            <button id="btnMenuRev" class="hud-mini-btn" title="Acelerar Motor (Ouvir Ronco)">🔊</button>
             <button id="btnMenuNextCar" class="hud-mini-btn" title="Próximo Carro">▶</button>
           </div>
-          <div style="font-size:10px; color:var(--muted); margin-top:4px; text-align:center;">Arraste para girar em 3D • 7 Tiers (Simples → Hipercarro)</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:4px; text-align:center;">Arraste para girar em 3D • Toque 🔊 para ouvir o motor</div>
         </div>
         <button id="btnPlay" class="btn btn-primary">INICIAR CORRIDA →</button>
       </div>
@@ -86,7 +87,10 @@
         <button id="btnGarageBack" class="btn">← Voltar</button>
         <h2 style="margin:0; font-size:17px; font-style:italic;" class="neon-cyan">GARAGEM JDM 3D • SIMPLES AO TOP</h2>
       </div>
-      <span id="garageYen" class="yen-badge">¥ 8.500</span>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button id="btnGarageRev" class="btn btn-cyan" title="Acelerar Motor">🔊 Acelerar Motor</button>
+        <span id="garageYen" class="yen-badge">¥ 8.500</span>
+      </div>
     </div>
 
     <div class="garage-main">

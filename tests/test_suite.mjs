@@ -29,6 +29,7 @@ const { buildWorld, TRACKS, queryWorldTrack } = await import('../js/world.js');
 const { RaceSimulation } = await import('../js/physics.js');
 const { CARS, computeCarStats } = await import('../js/cars.js');
 const { SaveManager } = await import('../js/storage.js');
+const { ENGINE_PROFILES, TokyoAudioEngine } = await import('../js/audio.js');
 
 const execFileAsync = promisify(execFile);
 
@@ -225,6 +226,23 @@ test('Progression save system: Yen rewards, unlocks & challenge completion', () 
   assert.equal(res.isNewRecord, true);
   assert.ok(res.newlyCompleted.length >= 4, 'Should unlock multiple progression challenges');
   assert.ok(save.data.yen > 15000, 'Should award challenge Yen bonuses');
+});
+
+test('Realistic per-car engine profiles & turbo upgrade audio configuration', () => {
+  const seenProfiles = new Set();
+  for (const car of CARS) {
+    assert.ok(ENGINE_PROFILES[car.base.engineType], `Car ${car.id} missing valid ENGINE_PROFILES entry: ${car.base.engineType}`);
+    seenProfiles.add(car.base.engineType);
+    const stockStats = computeCarStats(car, { upgrades: { engine: 0, turbo: 0, drift: 0, tires: 0 } });
+    assert.equal(stockStats.engineType, car.base.engineType);
+    assert.equal(stockStats.hasTurbo, car.base.hasTurbo);
+    const turboStats = computeCarStats(car, { upgrades: { engine: 0, turbo: 1, drift: 0, tires: 0 } });
+    assert.equal(turboStats.hasTurbo, true, `Car ${car.id} should enable turbo sound when turbo upgrade installed`);
+  }
+  assert.equal(seenProfiles.size, CARS.length, 'Each of the 7 car tiers should have a distinct engine sound profile');
+  const audio = new TokyoAudioEngine({ sfxEnabled: true, musicEnabled: true });
+  audio.updateVehicle({ rpm: 0.75, gear: 3, slip: 0.5, nitro: false, throttle: true, engineType: 'v12_f1', hasTurbo: false, speed: 45, weather: 'rain', active: true });
+  audio.playRevBlip('rotary', true);
 });
 
 console.log('\n=== 3. HEADLESS CHROME MOBILE LANDSCAPE WEBGL & DOM VERIFICATION ===');
