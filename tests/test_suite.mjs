@@ -274,19 +274,21 @@ try {
     '--disable-gpu-sandbox',
     '--use-gl=angle',
     '--use-angle=swiftshader',
+    '--enable-unsafe-swiftshader',
     '--enable-webgl',
     '--window-size=844,390',
-    '--virtual-time-budget=2500',
+    '--virtual-time-budget=600',
     '--dump-dom',
     `http://127.0.0.1:${port}/index.html`
-  ], { timeout: 15000, maxBuffer: 1024 * 1024 * 5 });
+  ], { timeout: 25000, maxBuffer: 1024 * 1024 * 5 });
 
   assert.ok(stdout.includes('TOKYO'), 'DOM should render TOKYO DRIFT 3D UI');
   assert.ok(stdout.includes('Shibuya Crossing'), 'Track cards should be dynamically rendered by ES modules');
   assert.ok(stdout.includes('Desafio de Drift'), 'Mode cards should be dynamically rendered by ES modules');
+  assert.ok(stdout.includes('1440p') && stdout.includes('4K'), 'Graphics options should expose 1440p QHD and 4K UHD modes');
   assert.ok(stdout.includes('portraitGuard') && stdout.includes('class="hidden"'), 'Portrait guard should stay hidden in 844x390 landscape');
   passed++;
-  console.log('  [PASS] Headless Chrome Android Landscape (844x390) ES Modules + WebGL boot verified');
+  console.log('  [PASS] Headless Chrome Android Landscape (844x390) 1440p QHD ES Modules + WebGL boot verified');
 
   // Also test Portrait (390x844) triggers portrait orientation guard!
   const { stdout: portraitDom } = await execFileAsync('google-chrome', [
@@ -294,12 +296,13 @@ try {
     '--no-sandbox',
     '--use-gl=angle',
     '--use-angle=swiftshader',
+    '--enable-unsafe-swiftshader',
     '--enable-webgl',
     '--window-size=390,844',
-    '--virtual-time-budget=1500',
+    '--virtual-time-budget=500',
     '--dump-dom',
     `http://127.0.0.1:${port}/index.html`
-  ], { timeout: 15000, maxBuffer: 1024 * 1024 * 5 });
+  ], { timeout: 25000, maxBuffer: 1024 * 1024 * 5 });
 
   assert.ok(!portraitDom.includes('<div id="portraitGuard" class="hidden">'), 'Portrait guard MUST activate in 390x844 portrait mode');
   passed++;

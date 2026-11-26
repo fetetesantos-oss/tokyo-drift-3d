@@ -80,13 +80,15 @@ class TokyoDriftApp {
 
   _getQualityConfig() {
     const s = this.settings;
-    const q = s.quality || 'auto';
-    const reflMap = { high: q === 'ultra' ? 1.25 : 1.0, medium: 0.55, off: 0.0 };
+    const q = s.quality || 'qhd1440';
+    const reflMap = { high: (q === 'uhd4k' || q === 'qhd1440' || q === 'ultra') ? 1.2 : 1.0, medium: 0.55, off: 0.0 };
     const styleMap = { realistic: 0.0, neon: 1.0, cyberpunk: 2.0 };
     const dprScale = (q === 'auto') ? this.qualityScale : (s.resScale ?? 1.0);
     const particles = (q === 'auto') ? this.particleBudget : (s.particleDensity ?? 1.0);
     return {
       dprScale,
+      resMode: s.resMode || (q === 'uhd4k' ? '4k' : (q === 'qhd1440' ? '1440p' : (q === 'high' ? '1080p' : (q === 'low' ? '720p' : 'native')))),
+      sharpen: s.sharpen ?? 0.65,
       particles,
       reflStrength: reflMap[s.reflections || 'high'] ?? 1.0,
       dynamicLights: s.dynamicLights !== false,
@@ -98,16 +100,16 @@ class TokyoDriftApp {
   _applyGraphicsPreset(preset) {
     const s = this.settings;
     s.quality = preset;
-    if (preset === 'ultra') {
-      s.resScale = 1.0; s.reflections = 'high'; s.dynamicLights = true; s.particleDensity = 1.0; s.drawDistance = 520;
+    if (preset === 'uhd4k') {
+      s.resMode = '4k'; s.resScale = 1.0; s.sharpen = 0.75; s.reflections = 'high'; s.dynamicLights = true; s.particleDensity = 1.0; s.drawDistance = 520;
+    } else if (preset === 'qhd1440' || preset === 'ultra') {
+      s.quality = 'qhd1440'; s.resMode = '1440p'; s.resScale = 1.0; s.sharpen = 0.65; s.reflections = 'high'; s.dynamicLights = true; s.particleDensity = 1.0; s.drawDistance = 520;
     } else if (preset === 'high') {
-      s.resScale = 0.92; s.reflections = 'high'; s.dynamicLights = true; s.particleDensity = 0.85; s.drawDistance = 440;
-    } else if (preset === 'medium') {
-      s.resScale = 0.78; s.reflections = 'medium'; s.dynamicLights = true; s.particleDensity = 0.6; s.drawDistance = 380;
+      s.resMode = '1080p'; s.resScale = 1.0; s.sharpen = 0.55; s.reflections = 'high'; s.dynamicLights = true; s.particleDensity = 0.85; s.drawDistance = 440;
     } else if (preset === 'low') {
-      s.resScale = 0.58; s.reflections = 'off'; s.dynamicLights = false; s.particleDensity = 0.3; s.drawDistance = 260;
+      s.resMode = '720p'; s.resScale = 0.8; s.sharpen = 0.35; s.reflections = 'off'; s.dynamicLights = false; s.particleDensity = 0.35; s.drawDistance = 260;
     } else if (preset === 'auto') {
-      s.resScale = 1.0; s.reflections = 'high'; s.dynamicLights = true; s.particleDensity = 1.0; s.drawDistance = 520;
+      s.resMode = 'native'; s.resScale = 1.0; s.sharpen = 0.60; s.reflections = 'high'; s.dynamicLights = true; s.particleDensity = 1.0; s.drawDistance = 520;
       this.qualityScale = 1.0; this.particleBudget = 1.0;
     }
     this.save.save();
@@ -118,9 +120,26 @@ class TokyoDriftApp {
 
   _applyQualityProfile() {
     const cfg = this._getQualityConfig();
-    this.renderer.resize(window.innerWidth, window.innerHeight, cfg.dprScale);
+    this.renderer.resize(window.innerWidth, window.innerHeight, cfg.dprScale, cfg.resMode);
     const fpsEl = document.getElementById('hudFps');
     if (fpsEl) fpsEl.classList.toggle('hidden', this.settings.showFps === false);
+    this._syncActiveResReadout();
+  }
+
+  _getResolutionLabel() {
+    const h = Math.min(this.renderer.renderWidth || 0, this.renderer.renderHeight || 0);
+    if (h >= 2000) return '4K';
+    if (h >= 1350) return '1440p';
+    if (h >= 1000) return '1080p';
+    if (h >= 680) return '720p';
+    return `${h}p`;
+  }
+
+  _syncActiveResReadout() {
+    const el = document.getElementById('valActiveRes');
+    if (el && this.renderer) {
+      el.textContent = `${this.renderer.renderWidth}×${this.renderer.renderHeight} • ${this._getResolutionLabel()}`;
+    }
   }
 
   _loadTrackAndGarageMeshes() {
@@ -490,6 +509,14 @@ class TokyoDriftApp {
       this._applyQualityProfile();
       this._syncGraphicsUI();
     };
+    document.getElementById('selResMode')?.addEventListener('change', (e) => {
+      this.settings.resMode = e.target.value;
+      markCustomGfx();
+    });
+    document.getElementById('rngSharpen')?.addEventListener('input', (e) => {
+      this.settings.sharpen = parseFloat(e.target.value);
+      markCustomGfx();
+    });
     document.getElementById('selVisualStyle')?.addEventListener('change', (e) => {
       this.settings.visualStyle = e.target.value;
       this.save.save();
@@ -609,7 +636,10 @@ class TokyoDriftApp {
     const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     const setChk = (id, v) => { const el = document.getElementById(id); if (el) el.checked = !!v; };
     const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    setVal('selVisualStyle', s.visualStyle || 'neon');
+    setVal('selResMode', s.resMode || '1440p');
+    setVal('rngSharpen', s.sharpen ?? 0.65);
+    setTxt('valSharpen', Math.round((s.sharpen ?? 0.65) * 100) + '%');
+    setVal('selVisualStyle', s.visualStyle || 'realistic');
     setVal('rngResScale', s.resScale ?? 1.0);
     setTxt('valResScale', Math.round((s.resScale ?? 1.0) * 100) + '%');
     setVal('selReflections', s.reflections || 'high');
@@ -618,6 +648,7 @@ class TokyoDriftApp {
     setTxt('valParticles', Math.round((s.particleDensity ?? 1.0) * 100) + '%');
     setVal('selDrawDistance', String(s.drawDistance || 520));
     setChk('chkShowFps', s.showFps !== false);
+    this._syncActiveResReadout();
   }
 
   _showToast(msg, ms = 2200) {
@@ -1213,7 +1244,7 @@ class TokyoDriftApp {
     document.getElementById('hudAngle').textContent = `${Math.round(p.driftAngleDeg)}°`;
     document.getElementById('hudRpmBar').style.width = `${Math.round(p.rpm * 100)}%`;
     document.getElementById('hudNitroBar').style.width = `${Math.round(p.nitro)}%`;
-    document.getElementById('hudFps').textContent = `${Math.round(this.currentFps)} FPS`;
+    document.getElementById('hudFps').textContent = `${this._getResolutionLabel()} • ${Math.round(this.currentFps)} FPS`;
 
     // Position / Lap / Timer
     const posWrap = document.getElementById('hudPosWrap');

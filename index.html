@@ -268,17 +268,36 @@
   <div id="graphicsModal" class="modal-backdrop hidden">
     <div class="glass modal-card">
       <div class="modal-head">
-        <h2>OPÇÕES GRÁFICAS 3D</h2>
+        <h2>OPÇÕES GRÁFICAS 3D • QHD / 4K</h2>
         <button id="btnCloseGraphics" class="btn">✕</button>
       </div>
 
-      <span class="sec-label">Perfil Rápido (Presets)</span>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+        <span class="sec-label" style="margin:0;">Perfil Rápido (Presets)</span>
+        <span id="valActiveRes" class="pill-cyan">2560×1440 • QHD</span>
+      </div>
       <div id="gfxPresetRow" class="chip-row" style="margin-bottom:10px;">
+        <button class="chip-btn" data-preset="uhd4k">🔥 4K UHD</button>
+        <button class="chip-btn" data-preset="qhd1440">💎 1440p QHD</button>
+        <button class="chip-btn" data-preset="high">✨ 1080p FHD</button>
         <button class="chip-btn" data-preset="auto">⚡ Auto 60 FPS</button>
-        <button class="chip-btn" data-preset="ultra">💎 Ultra</button>
-        <button class="chip-btn" data-preset="high">✨ Alto</button>
-        <button class="chip-btn" data-preset="medium">⚖ Médio</button>
-        <button class="chip-btn" data-preset="low">🔋 Leve</button>
+        <button class="chip-btn" data-preset="low">🔋 720p Leve</button>
+      </div>
+
+      <div class="setting-row">
+        <span>Resolução 3D Alvo (Supersampling)</span>
+        <select id="selResMode">
+          <option value="4k">4K Ultra HD (3840×2160)</option>
+          <option value="1440p">1440p Quad HD (2560×1440)</option>
+          <option value="1080p">1080p Full HD (1920×1080)</option>
+          <option value="native">Nativa da Tela (até 3.5× DPR)</option>
+          <option value="720p">720p HD (Leve / Máx. FPS)</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <span>Nitidez CAS (Sharpening) (<strong id="valSharpen">65%</strong>)</span>
+        <input id="rngSharpen" type="range" min="0" max="1.0" step="0.05" value="0.65" />
       </div>
 
       <div class="setting-row">
@@ -291,7 +310,7 @@
       </div>
 
       <div class="setting-row">
-        <span>Resolução 3D (<strong id="valResScale">100%</strong>)</span>
+        <span>Escala Fina da Resolução (<strong id="valResScale">100%</strong>)</span>
         <input id="rngResScale" type="range" min="0.5" max="1.0" step="0.05" value="1.0" />
       </div>
 
@@ -305,7 +324,7 @@
       </div>
 
       <div class="setting-row">
-        <span>Iluminação Dinâmica (Faróis, Freio &amp; Underglow)</span>
+        <span>Iluminação Dinâmica (Faróis, Freio &amp; Bloom)</span>
         <input id="chkDynamicLights" type="checkbox" checked />
       </div>
 
@@ -324,7 +343,7 @@
       </div>
 
       <div class="setting-row">
-        <span>Mostrar Contador de FPS na Tela</span>
+        <span>Mostrar Resolução &amp; FPS na Tela</span>
         <input id="chkShowFps" type="checkbox" checked />
       </div>
     </div>
@@ -372,13 +391,13 @@
       </div>
 
       <div class="setting-row">
-        <span>Qualidade Gráfica</span>
+        <span>Qualidade &amp; Resolução 3D</span>
         <select id="selQuality">
+          <option value="uhd4k">4K Ultra HD (3840×2160 • Máx. Nitidez)</option>
+          <option value="qhd1440">1440p Quad HD (2560×1440 • Recomendado)</option>
+          <option value="high">1080p Full HD (1920×1080)</option>
           <option value="auto">Auto (Adaptativo 60 FPS)</option>
-          <option value="ultra">Ultra (Máximo Realismo)</option>
-          <option value="high">Alto (Reflexos + Full DPR)</option>
-          <option value="medium">Médio (Equilibrado)</option>
-          <option value="low">Leve (Economia de Bateria)</option>
+          <option value="low">720p Leve (Economia de Bateria)</option>
           <option value="custom">Personalizado</option>
         </select>
       </div>

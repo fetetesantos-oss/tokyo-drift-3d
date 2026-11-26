@@ -52,8 +52,10 @@ function createDefaultSave() {
       tiltDeadzone: 3.5,
       tiltCenter: 0,
       tiltInvert: false,
-      quality: 'auto',
+      quality: 'qhd1440',
+      resMode: '1440p',
       resScale: 1.0,
+      sharpen: 0.65,
       reflections: 'high',
       dynamicLights: true,
       particleDensity: 1.0,
@@ -93,6 +95,12 @@ export class SaveManager {
         merged.settings.photorealHeroV4 = true;
         merged.cars.shogun.unlocked = true;
         merged.selectedCar = 'shogun';
+      }
+      if (!merged.settings.qhd4kUpgradeV5) {
+        merged.settings.quality = 'qhd1440';
+        merged.settings.resMode = '1440p';
+        merged.settings.sharpen = 0.65;
+        merged.settings.qhd4kUpgradeV5 = true;
       }
       for (const c of CARS) {
         if (parsed.cars && parsed.cars[c.id]) {

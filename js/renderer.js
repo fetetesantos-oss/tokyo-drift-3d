@@ -27,7 +27,11 @@ const MAIN_VS = `
 `;
 
 const MAIN_FS = `
-  precision mediump float;
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
+    precision highp float;
+  #else
+    precision mediump float;
+  #endif
 
   varying vec3 vWorldPos;
   varying vec3 vNormal;
@@ -94,17 +98,23 @@ const MAIN_FS = `
       emissive = (matCode - 0.65) / 0.35;
     }
 
-    if (uUseTex > 0.5) {
-      vec4 texel = texture2D(uTex, vUV);
-      baseCol *= texel.rgb;
-      emissive = max(emissive, texel.a * 0.98);
-    }
-
     vec3 N = normalize(vNormal);
     vec3 V = normalize(uCamPos - vWorldPos);
 
     // Micro-bump wet asphalt normal perturbation for photorealistic rain-rippled vertical city reflections!
     bool isRoad = (uUseTex > 0.5 && N.y > 0.88 && matCode < 0.12);
+
+    if (uUseTex > 0.5) {
+      vec4 texel = texture2D(uTex, vUV);
+      baseCol *= texel.rgb;
+      if (isRoad) {
+        emissive = max(emissive, texel.a * 0.98);
+      } else {
+        float texLum = dot(texel.rgb, vec3(0.30, 0.59, 0.11));
+        float bldgEm = texLum > 0.22 ? clamp((texLum - 0.172) * 1.48, 0.0, 1.0) : 0.0;
+        emissive = max(emissive, bldgEm * 0.98);
+      }
+    }
     float puddleMask = 0.0;
     if (isRoad && uWetness > 0.1) {
       float p1 = sin(vWorldPos.x * 0.22) * cos(vWorldPos.z * 0.17);
@@ -254,12 +264,18 @@ const BLOOM_BLUR_FS = `
 `;
 
 const COMPOSITE_FS = `
-  precision mediump float;
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
+    precision highp float;
+  #else
+    precision mediump float;
+  #endif
   varying vec2 vUV;
   uniform sampler2D uScene;
   uniform sampler2D uBloom;
   uniform float uBloomStrength;
   uniform float uColorStyle;
+  uniform vec2 uTexelSize;
+  uniform float uSharpen;
 
   vec3 acesToneMap(vec3 x) {
     float a = 2.51;
@@ -270,21 +286,38 @@ const COMPOSITE_FS = `
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
   }
 
+  // Contrast Adaptive Sharpening (CAS) — crisp 1440p/4K detail without halo artifacts
+  vec3 sampleCAS(vec2 uv) {
+    vec3 c = texture2D(uScene, uv).rgb;
+    if (uSharpen <= 0.01) return c;
+    vec3 n = texture2D(uScene, uv + vec2(0.0, -uTexelSize.y)).rgb;
+    vec3 s = texture2D(uScene, uv + vec2(0.0,  uTexelSize.y)).rgb;
+    vec3 e = texture2D(uScene, uv + vec2( uTexelSize.x, 0.0)).rgb;
+    vec3 w = texture2D(uScene, uv + vec2(-uTexelSize.x, 0.0)).rgb;
+
+    vec3 mn = min(c, min(min(n, s), min(e, w)));
+    vec3 mx = max(c, max(max(n, s), max(e, w)));
+    vec3 amp = clamp(min(mn, 1.0 - mx) / max(mx, vec3(0.001)), 0.0, 1.0);
+    float weight = -0.14 * uSharpen;
+    vec3 sharp = (c + (n + s + e + w) * (weight * (0.45 + 0.55 * amp))) / (1.0 + 4.0 * weight * (0.45 + 0.55 * amp));
+    return clamp(sharp, 0.0, 2.0);
+  }
+
   void main() {
-    vec3 sceneCol = texture2D(uScene, vUV).rgb;
+    vec3 sceneCol = sampleCAS(vUV);
     vec3 bloomCol = texture2D(uBloom, vUV).rgb;
     vec3 hdr = sceneCol + bloomCol * uBloomStrength;
 
-    // Cinematic subtle vignette framing
+    // Subtle cinema vignette framing
     vec2 vigUV = vUV * 2.0 - 1.0;
-    float vig = clamp(1.0 - dot(vigUV, vigUV) * 0.24, 0.58, 1.0);
+    float vig = clamp(1.0 - dot(vigUV, vigUV) * 0.20, 0.64, 1.0);
     vec3 col = acesToneMap(hdr * 1.12) * vig;
 
     float luma = dot(col, vec3(0.299, 0.587, 0.114));
     if (uColorStyle < 0.5) {
       // Photorealistic Rainy Shibuya Cinema Grade: rich deep cool blacks, crisp white highlights, vivid taillight reds
-      col = mix(vec3(luma), col, 1.06);
-      col = pow(clamp(col, 0.0, 1.0), vec3(1.02, 1.00, 0.96));
+      col = mix(vec3(luma), col, 1.07);
+      col = pow(clamp(col, 0.0, 1.0), vec3(1.01, 1.00, 0.96));
     } else if (uColorStyle >= 1.5) {
       col = mix(vec3(luma), col, 1.32);
     }
@@ -376,6 +409,19 @@ export class TokyoRenderer {
     if (!gl) throw new Error('WebGL não suportado neste dispositivo.');
     this.gl = gl;
     gl.getExtension('OES_element_index_uint');
+    this.anisoExt = (
+      gl.getExtension('EXT_texture_filter_anisotropic') ||
+      gl.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
+      gl.getExtension('WEBKIT_EXT_texture_filter_anisotropic')
+    );
+    this.maxAniso = this.anisoExt
+      ? Math.min(16, gl.getParameter(this.anisoExt.MAX_TEXTURE_MAX_ANISOTROPY_EXT) || 4)
+      : 1;
+    this.maxSurfaceDim = Math.min(
+      gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096,
+      gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 4096,
+      4096
+    );
 
     this.mainProg = createProgram(gl, MAIN_VS, MAIN_FS);
     this.partProg = createProgram(gl, PARTICLE_VS, PARTICLE_FS);
@@ -400,6 +446,7 @@ export class TokyoRenderer {
     this.bloomActive = false;
     this.curColorStyle = 0.0;
     this.curBloomStrength = 0.72;
+    this.curSharpen = 0.65;
 
     // Particles & Additive Halos buffers
     this.maxParticles = 700;
@@ -425,6 +472,8 @@ export class TokyoRenderer {
     this.dpr = 1;
     this.width = 1;
     this.height = 1;
+    this.renderWidth = 1;
+    this.renderHeight = 1;
     this.time = 0;
 
     gl.enable(gl.DEPTH_TEST);
@@ -516,7 +565,9 @@ export class TokyoRenderer {
       uScene: gl.getUniformLocation(this.compProg, 'uScene'),
       uBloom: gl.getUniformLocation(this.compProg, 'uBloom'),
       uBloomStrength: gl.getUniformLocation(this.compProg, 'uBloomStrength'),
-      uColorStyle: gl.getUniformLocation(this.compProg, 'uColorStyle')
+      uColorStyle: gl.getUniformLocation(this.compProg, 'uColorStyle'),
+      uTexelSize: gl.getUniformLocation(this.compProg, 'uTexelSize'),
+      uSharpen: gl.getUniformLocation(this.compProg, 'uSharpen')
     };
   }
 
@@ -530,40 +581,50 @@ export class TokyoRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    if (this.anisoExt && this.maxAniso > 1) {
+      gl.texParameterf(gl.TEXTURE_2D, this.anisoExt.TEXTURE_MAX_ANISOTROPY_EXT, this.maxAniso);
+    }
     gl.generateMipmap(gl.TEXTURE_2D);
     return tex;
   }
 
-  // Deep Dark Rain-Soaked Shibuya Asphalt Texture
+  // Ultra-Crisp 1024x1024 Rain-Soaked Shibuya Asphalt Texture (fast integer noise + 16x Anisotropic Filtering)
   _createAsphaltTexture() {
+    const S = 1024;
     const c = document.createElement('canvas');
-    c.width = 512; c.height = 512;
+    c.width = S; c.height = S;
     const g = c.getContext('2d');
-    const img = g.createImageData(512, 512);
+    const img = g.createImageData(S, S);
     const d = img.data;
 
-    for (let y = 0; y < 512; y++) {
-      for (let x = 0; x < 512; x++) {
-        const idx = (y * 512 + x) * 4;
-        const grain = Math.abs((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1);
-        const fine = Math.abs((Math.sin(x * 41.3 + y * 19.7) * 19283.23) % 1);
-        const trackL = Math.exp(-Math.pow((x - 140) / 52, 2)) + Math.exp(-Math.pow((x - 372) / 52, 2));
-        const n = grain * 10 + fine * 5 - trackL * 5;
+    const trackLUT = new Float32Array(S);
+    for (let x = 0; x < S; x++) {
+      trackLUT[x] = (Math.exp(-Math.pow((x - 280) / 104, 2)) + Math.exp(-Math.pow((x - 744) / 104, 2))) * 5.0;
+    }
+
+    for (let y = 0; y < S; y++) {
+      const ym = y & 255;
+      const rowOff = y * S;
+      const hy = Math.imul(y, 1597334677);
+      for (let x = 0; x < S; x++) {
+        const idx = (rowOff + x) << 2;
+        let h = Math.imul(x, 374761393) ^ hy;
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        const grain = ((h ^ (h >>> 16)) & 255) * (16 / 255);
+        const n = grain - trackLUT[x];
         let r = 18 + n, gr = 21 + n, b = 28 + n, em = 0;
 
-        if ((x >= 14 && x <= 26) || (x >= 486 && x <= 498)) {
-          r = 232; gr = 238; b = 248; em = 105;
-        }
-        if (((x >= 249 && x <= 254) || (x >= 258 && x <= 263)) && (y % 128) < 76) {
-          r = 250; gr = 198; b = 68; em = 120;
-        }
-        if (((x >= 132 && x <= 137) || (x >= 375 && x <= 380)) && (y % 128) < 46) {
-          r = 205; gr = 215; b = 230; em = 60;
+        if ((x >= 28 && x <= 52) || (x >= 972 && x <= 996)) {
+          r = 236; gr = 242; b = 250; em = 110;
+        } else if (((x >= 498 && x <= 508) || (x >= 516 && x <= 526)) && ym < 152) {
+          r = 252; gr = 200; b = 68; em = 126;
+        } else if (((x >= 264 && x <= 274) || (x >= 750 && x <= 760)) && ym < 92) {
+          r = 208; gr = 218; b = 234; em = 64;
         }
 
-        d[idx] = Math.max(0, Math.min(255, r));
-        d[idx + 1] = Math.max(0, Math.min(255, gr));
-        d[idx + 2] = Math.max(0, Math.min(255, b));
+        d[idx] = r < 0 ? 0 : (r > 255 ? 255 : r);
+        d[idx + 1] = gr < 0 ? 0 : (gr > 255 ? 255 : gr);
+        d[idx + 2] = b < 0 ? 0 : (b > 255 ? 255 : b);
         d[idx + 3] = em;
       }
     }
@@ -571,11 +632,13 @@ export class TokyoRenderer {
     return this._uploadCanvasTexture(c);
   }
 
-  // Ultra-Rich 1024x1024 Photorealistic Shibuya Crossing Commercial Skyscraper Facade Texture!
+  // Ultra-Crisp 2048x2048 (2K) Photorealistic Shibuya Crossing Commercial Skyscraper Facade Texture!
   _createShibuyaFacadeTexture() {
+    const texSize = this.maxSurfaceDim >= 2048 ? 2048 : 1024;
     const c = document.createElement('canvas');
-    c.width = 1024; c.height = 1024;
+    c.width = texSize; c.height = texSize;
     const g = c.getContext('2d');
+    if (texSize === 2048) g.scale(2, 2);
 
     g.fillStyle = '#0c1018';
     g.fillRect(0, 0, 1024, 1024);
@@ -658,33 +721,65 @@ export class TokyoRenderer {
       }
     }
 
-    const img = g.getImageData(0, 0, 1024, 1024);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const lum = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11);
-      d[i + 3] = lum > 56 ? Math.min(255, Math.floor((lum - 44) * 1.48)) : 0;
-    }
-    g.putImageData(img, 0, 0);
+    // Emissive luminance is extracted in GPU MAIN_FS — zero CPU getImageData stall on mobile!
     return this._uploadCanvasTexture(c);
   }
 
-  resize(width, height, qualityScale = 1.0) {
-    const rawDpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.dpr = Math.max(0.75, rawDpr * qualityScale);
+  resize(width, height, qualityScale = 1.0, resMode = '1440p') {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
-    const cw = Math.max(2, Math.floor(this.width * this.dpr));
-    const ch = Math.max(2, Math.floor(this.height * this.dpr));
+    const aspect = this.width / this.height;
+    const maxDim = this.maxSurfaceDim || 4096;
+
+    // Target height map for crisp QHD 1440p / 4K UHD supersampling!
+    const targetHeights = {
+      '4k': 2160,
+      '1440p': 1440,
+      '1080p': 1080,
+      '720p': 720
+    };
+
+    let cw, ch;
+    if (targetHeights[resMode]) {
+      const baseH = targetHeights[resMode] * Math.max(0.5, Math.min(1.0, qualityScale));
+      if (aspect >= 1) {
+        ch = Math.round(baseH);
+        cw = Math.round(ch * aspect);
+      } else {
+        cw = Math.round(baseH);
+        ch = Math.round(cw / aspect);
+      }
+      // Clamp cleanly to GPU hardware limits while preserving exact aspect ratio
+      const maxSide = Math.max(cw, ch);
+      if (maxSide > maxDim) {
+        const s = maxDim / maxSide;
+        cw = Math.floor(cw * s);
+        ch = Math.floor(ch * s);
+      }
+      this.dpr = ch / this.height;
+    } else {
+      // Native DPR mode (allows full 3.5x flagship mobile OLED resolution!)
+      const rawDpr = Math.min(window.devicePixelRatio || 1, 3.5);
+      this.dpr = Math.max(0.75, rawDpr * qualityScale);
+      cw = Math.min(maxDim, Math.max(2, Math.floor(this.width * this.dpr)));
+      ch = Math.min(maxDim, Math.max(2, Math.floor(this.height * this.dpr)));
+    }
+
+    cw = Math.max(2, cw);
+    ch = Math.max(2, ch);
     this.canvas.width = cw;
     this.canvas.height = ch;
+    this.renderWidth = cw;
+    this.renderHeight = ch;
 
-    // Rebuild Selective Bloom FBOs matching viewport size
+    // Rebuild Selective Bloom FBOs matching QHD/4K render target (bloom blur FBO capped at <=960px for fast 60fps!)
     this._destroyFBO(this.sceneFBO);
     this._destroyFBO(this.bloomFBO1);
     this._destroyFBO(this.bloomFBO2);
     this.sceneFBO = this._createFBO(cw, ch, true);
-    const bw = Math.max(2, Math.floor(cw * 0.5));
-    const bh = Math.max(2, Math.floor(ch * 0.5));
+    const bloomScale = Math.min(0.5, 960 / Math.max(cw, ch));
+    const bw = Math.max(2, Math.floor(cw * bloomScale));
+    const bh = Math.max(2, Math.floor(ch * bloomScale));
     this.bloomFBO1 = this._createFBO(bw, bh, false);
     this.bloomFBO2 = this._createFBO(bw, bh, false);
     this.gl.viewport(0, 0, cw, ch);
@@ -694,7 +789,8 @@ export class TokyoRenderer {
     const gl = this.gl;
     this.time += 0.016;
     this.curColorStyle = gfxOpts.colorStyle ?? 0.0;
-    this.curBloomStrength = gfxOpts.reflStrength > 0.1 ? (this.curColorStyle >= 1.5 ? 0.95 : 0.68) : 0.25;
+    this.curSharpen = gfxOpts.sharpen ?? 0.65;
+    this.curBloomStrength = gfxOpts.reflStrength > 0.1 ? (this.curColorStyle >= 1.5 ? 0.92 : 0.62) : 0.25;
     this.bloomActive = !!(this.sceneFBO && this.bloomFBO1 && this.bloomFBO2 && gfxOpts.dynamicLights !== false);
 
     if (this.bloomActive) {
@@ -731,7 +827,7 @@ export class TokyoRenderer {
     gl.uniform1f(this.mLoc.uColorStyle, this.curColorStyle);
   }
 
-  // Finalize frame: Selective Bright-Pass -> 2-Pass Separable Gaussian Blur -> ACES Filmic Bloom Composite!
+  // Finalize frame: Selective Bright-Pass -> 2-Pass Separable Gaussian Blur -> CAS Sharpened ACES Filmic Composite!
   endFrame() {
     if (!this.bloomActive) return;
     const gl = this.gl;
@@ -768,7 +864,7 @@ export class TokyoRenderer {
     gl.uniform2f(this.bLoc.uDir, 0.0, 1.8 / this.bloomFBO1.h);
     drawQuad(this.bLoc.aPos);
 
-    // Pass 4: ACES Filmic Composite to Screen
+    // Pass 4: CAS Sharpening + ACES Filmic Composite to Screen
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(this.compProg);
@@ -780,6 +876,8 @@ export class TokyoRenderer {
     gl.uniform1i(this.cLoc.uBloom, 1);
     gl.uniform1f(this.cLoc.uBloomStrength, this.curBloomStrength);
     gl.uniform1f(this.cLoc.uColorStyle, this.curColorStyle);
+    gl.uniform2f(this.cLoc.uTexelSize, 1.0 / this.sceneFBO.w, 1.0 / this.sceneFBO.h);
+    gl.uniform1f(this.cLoc.uSharpen, this.curSharpen);
     drawQuad(this.cLoc.aPos);
 
     // Unbind FBO textures so the next frame never triggers a WebGL feedback loop!
