@@ -1,0 +1,10 @@
+{
+  "name": "TOKYO DRIFT 3D",
+  "short_name": "TokyoDrift3D",
+  "description": "Jogo de corrida e drift 3D mobile ambientado nas ruas noturnas de Tóquio com controle por giroscópio.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050710",
+  "theme_color": "#ff2a85"
+}
