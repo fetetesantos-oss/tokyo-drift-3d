@@ -9,9 +9,9 @@
   <meta name="screen-orientation" content="landscape" />
   <link rel="manifest" href="./assets/manifest-DS6d0Gnq.webmanifest" />
   <title>TOKYO DRIFT 3D | Mobile</title>
-  <script type="module" crossorigin src="./assets/index-C9ucImzr.js"></script>
+  <script type="module" crossorigin src="./assets/index-DeTHS-0n.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/three-B79oiNPY.js">
-  <link rel="stylesheet" crossorigin href="./assets/index-CPxJheCo.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-CDXmCH8A.css">
 </head>
 <body>
   <canvas id="glCanvas"></canvas>
@@ -42,6 +42,7 @@
       <div class="top-actions">
         <span id="menuYen" class="yen-badge">¥ 8.500</span>
         <button id="btnOpenGarage" class="btn btn-cyan">🔧 Garagem 3D</button>
+        <button id="btnOpenRadio" class="btn">📻 Rádio</button>
         <button id="btnOpenGraphics" class="btn">🎨 Gráficos</button>
         <button id="btnOpenRanking" class="btn">🏆 Ranking</button>
         <button id="btnOpenSettings" class="btn">⚙ Sensor &amp; Áudio</button>
@@ -119,7 +120,7 @@
 
         <div id="gCustomWrap" style="display:flex; flex-direction:column; gap:9px;">
           <div>
-            <span class="sec-label">Pintura &amp; Neon Underglow</span>
+            <span class="sec-label">Pintura &amp; Acabamento</span>
             <div id="gPaintRow" class="swatch-row"></div>
           </div>
           <div>
@@ -159,13 +160,20 @@
   <!-- ==================== IN-GAME LANDSCAPE HUD ==================== -->
   <div id="hudLayer" class="hidden safe-pad">
     <div class="hud-top">
-      <!-- Score & Lap -->
-      <div class="glass hud-score-card">
-        <div style="font-size:10px; font-weight:800; color:var(--muted); letter-spacing:0.12em;">DRIFT PTS</div>
-        <div id="hudScore" class="hud-score-val">0</div>
-        <div class="hud-meta-row">
-          <span id="hudLap">Volta 1</span>
-          <span id="hudRivalScore" class="hidden">RIVAL: 0</span>
+      <!-- Score, Lap & Compact In-Car Radio -->
+      <div class="hud-left-col">
+        <div class="glass hud-score-card">
+          <div style="font-size:10px; font-weight:800; color:var(--muted); letter-spacing:0.12em;">DRIFT PTS</div>
+          <div id="hudScore" class="hud-score-val">0</div>
+          <div class="hud-meta-row">
+            <span id="hudLap">Volta 1</span>
+            <span id="hudRivalScore" class="hidden">RIVAL: 0</span>
+          </div>
+        </div>
+        <div id="hudRadioBar" class="glass hud-radio-bar">
+          <button id="btnHudRadioOpen" class="hud-radio-title" title="Abrir Rádio / Minhas Músicas">📻 Tokyo Midnight</button>
+          <button id="btnHudRadioPrev" class="hud-radio-btn" title="Faixa Anterior">⏮</button>
+          <button id="btnHudRadioNext" class="hud-radio-btn" title="Próxima Faixa / Estação (B)">⏭</button>
         </div>
       </div>
 
@@ -259,9 +267,10 @@
       <div style="display:flex; flex-direction:column; gap:8px;">
         <button id="btnPauseResume" class="btn btn-primary">CONTINUAR CORRIDA</button>
         <button id="btnPauseRestart" class="btn">↺ Reiniciar Corrida</button>
-        <button id="btnPauseCalib" class="btn btn-cyan">◎ Calibrar Ponto Central do Giroscópio</button>
+        <button id="btnPauseRadio" class="btn btn-cyan">📻 Rádio do Carro &amp; Minhas Músicas</button>
+        <button id="btnPauseCalib" class="btn">◎ Calibrar Ponto Central do Giroscópio</button>
         <button id="btnPauseGraphics" class="btn">🎨 Opções Gráficas (Ultra / Realista / Leve)</button>
-        <button id="btnPauseSettings" class="btn">⚙ Sensibilidade, Controles &amp; Áudio</button>
+        <button id="btnPauseSettings" class="btn">⚙ Sensibilidade, Física &amp; Áudio</button>
         <button id="btnPauseMenu" class="btn">Voltar ao Menu Principal</button>
       </div>
     </div>
@@ -311,7 +320,7 @@
       <div class="setting-row">
         <span>Estilo Visual / Filtro de Cor</span>
         <select id="selVisualStyle">
-          <option value="realistic">Fotorrealista Noturno (Shibuya Chuva)</option>
+          <option value="realistic">Fotorrealista (Tóquio Natural • Sem Neon)</option>
           <option value="neon">Tóquio Neon Clássico</option>
           <option value="cyberpunk">Cyberpunk Neon Intenso</option>
         </select>
@@ -344,9 +353,10 @@
       <div class="setting-row">
         <span>Distância de Visão (Horizonte)</span>
         <select id="selDrawDistance">
-          <option value="520">Longa (520m • Cidade Completa)</option>
-          <option value="380">Média (380m • Balanceada)</option>
-          <option value="260">Curta (260m • Economia)</option>
+          <option value="680">Extrema (680m • Horizonte Completo)</option>
+          <option value="640">Longa (640m • Cidade Completa)</option>
+          <option value="520">Padrão (520m • Balanceada)</option>
+          <option value="320">Curta (320m • Economia)</option>
         </select>
       </div>
 
@@ -361,7 +371,7 @@
   <div id="settingsModal" class="modal-backdrop hidden">
     <div class="glass modal-card">
       <div class="modal-head">
-        <h2>CONTROLES, GIROSCÓPIO &amp; ÁUDIO</h2>
+        <h2>CONTROLES, FÍSICA &amp; ÁUDIO</h2>
         <button id="btnCloseSettings" class="btn">✕</button>
       </div>
 
@@ -369,7 +379,7 @@
         <div id="gyroStatus">Verificando sensor de inclinação...</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button id="btnEnableGyro" class="btn btn-cyan">📱 Ativar Giroscópio (iOS/Android)</button>
-          <button id="btnCalibrateCenter" class="btn">◎ Calibrar Centro</button>
+          <button id="btnCalibrateCenter" class="btn">◎ Calibrar Agora</button>
           <button id="btnResetCenter" class="btn">Zerar (0°)</button>
         </div>
       </div>
@@ -384,18 +394,38 @@
       </div>
 
       <div class="setting-row">
-        <span>Sensibilidade da Inclinação (<strong id="valSensitivity">1.35×</strong>)</span>
-        <input id="rngSensitivity" type="range" min="0.5" max="2.5" step="0.05" value="1.35" />
+        <span>Auto-Calibração Inteligente (Ajusta Centro Sozinho)</span>
+        <input id="chkAutoCalib" type="checkbox" checked />
       </div>
 
       <div class="setting-row">
-        <span>Zona Morta Central (<strong id="valDeadzone">3.5°</strong>)</span>
-        <input id="rngDeadzone" type="range" min="0" max="10" step="0.5" value="3.5" />
+        <span>Sensibilidade da Inclinação (<strong id="valSensitivity">0.85×</strong>)</span>
+        <input id="rngSensitivity" type="range" min="0.35" max="2.0" step="0.05" value="0.85" />
+      </div>
+
+      <div class="setting-row">
+        <span>Zona Morta Central (<strong id="valDeadzone">4.5°</strong>)</span>
+        <input id="rngDeadzone" type="range" min="0" max="10" step="0.5" value="4.5" />
       </div>
 
       <div class="setting-row">
         <span>Inverter Eixo de Inclinação</span>
         <input id="chkInvertTilt" type="checkbox" />
+      </div>
+
+      <div class="setting-row">
+        <span>Auto-Acelerar no Celular (Auto-Gas)</span>
+        <input id="chkAutoGas" type="checkbox" />
+      </div>
+
+      <div class="setting-row">
+        <span>Assistente de Drift &amp; Estabilidade (ESC)</span>
+        <input id="chkDriftAssist" type="checkbox" checked />
+      </div>
+
+      <div class="setting-row">
+        <span>Vibração Tátil no Celular (Marchas / Impacto)</span>
+        <input id="chkHaptics" type="checkbox" checked />
       </div>
 
       <div class="setting-row">
@@ -411,7 +441,7 @@
       </div>
 
       <div class="setting-row">
-        <span>Tráfego Noturno nas Ruas</span>
+        <span>Tráfego nas Ruas</span>
         <input id="chkTraffic" type="checkbox" checked />
       </div>
 
@@ -421,8 +451,75 @@
       </div>
 
       <div class="setting-row">
-        <span>Trilha Eletrônica Noturna</span>
+        <span>Volume do Motor / Efeitos (<strong id="valSfxVol">85%</strong>)</span>
+        <input id="rngSfxVol" type="range" min="0" max="1" step="0.05" value="0.85" />
+      </div>
+
+      <div class="setting-row">
+        <span>Rádio / Música Ligado</span>
         <input id="chkMusic" type="checkbox" checked />
+      </div>
+
+      <div class="setting-row">
+        <span>Volume do Rádio (<strong id="valRadioVol">72%</strong>)</span>
+        <input id="rngRadioVol" type="range" min="0" max="1" step="0.05" value="0.72" />
+      </div>
+
+      <div style="margin-top:10px;">
+        <button id="btnSettingsRadio" class="btn btn-cyan" style="width:100%;">📻 Abrir Rádio &amp; Colocar Minhas Músicas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== AUTOMOTIVE CAR RADIO MODAL ==================== -->
+  <div id="radioModal" class="modal-backdrop hidden">
+    <div class="glass modal-card">
+      <div class="modal-head">
+        <h2>📻 RÁDIO DO CARRO &amp; MINHAS MÚSICAS</h2>
+        <button id="btnCloseRadio" class="btn">✕</button>
+      </div>
+
+      <div class="radio-now-box">
+        <div style="min-width:0; flex:1;">
+          <div id="radioNowTitle" style="font-size:13px; font-weight:900; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">90.5 FM • Tokyo Midnight</div>
+          <div id="radioNowSub" style="font-size:10.5px; color:var(--cyan);">Hip-Hop / R&amp;B 90 BPM</div>
+          <div id="radioStatusNote" style="font-size:10px; color:var(--amber); margin-top:2px;"></div>
+        </div>
+        <div class="radio-transport">
+          <button id="btnRadioPrev" class="hud-mini-btn" title="Anterior">⏮</button>
+          <button id="btnRadioPlayPause" class="hud-mini-btn" title="Tocar / Pausar">⏯</button>
+          <button id="btnRadioNext" class="hud-mini-btn" title="Próxima">⏭</button>
+          <button id="btnRadioShuffle" class="hud-mini-btn" title="Modo Aleatório">🔀</button>
+        </div>
+      </div>
+
+      <span class="sec-label">Estações de Rádio</span>
+      <div id="radioStationGrid" class="grid-2" style="margin-bottom:10px;"></div>
+
+      <div class="setting-row">
+        <span>Volume do Rádio (<strong id="valRadioModalVol">72%</strong>)</span>
+        <input id="rngRadioModalVol" type="range" min="0" max="1" step="0.05" value="0.72" />
+      </div>
+
+      <div style="margin-top:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+          <span class="sec-label" style="margin:0;">🎵 Minhas Músicas (Salvas no Celular)</span>
+          <button id="btnRadioClearFiles" class="btn" style="padding:3px 8px; font-size:10px;">Limpar</button>
+        </div>
+        <input id="radioFileInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac,.webm" multiple style="display:none;" />
+        <button id="btnRadioAddFiles" class="btn btn-primary" style="width:100%; padding:9px 12px; font-size:11.5px; margin-bottom:8px;">
+          ➕ ADICIONAR QUALQUER MÚSICA DO CELULAR (MP3 / M4A / WAV)
+        </button>
+        <div id="radioTrackList" class="radio-track-list"></div>
+      </div>
+
+      <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border);">
+        <span class="sec-label">🌐 Rádio Web Ao Vivo (Stream HTTPS)</span>
+        <div id="radioStreamPresets" class="chip-row" style="margin-bottom:6px;"></div>
+        <div style="display:flex; gap:6px;">
+          <input id="inpRadioStreamUrl" type="url" placeholder="Cole link de rádio https://... (.mp3 / stream)" class="radio-url-input" />
+          <button id="btnRadioPlayStream" class="btn btn-cyan" style="white-space:nowrap;">Tocar</button>
+        </div>
       </div>
     </div>
   </div>
